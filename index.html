@@ -1,0 +1,1787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reelcall</title>
+<meta name="description" content="AI sorts your Instagram saves into categories so you can actually find them.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Gluten:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#F2F4F6; --surface:#FFFFFF; --surface2:#ECEFF2; --ink:#141C25; --muted:#66717F; --line:#DEE3E8;
+  --brand:#0E6B66; --brand-ink:#FFFFFF; --ai:#E3A21F; --ai-soft:#FCF1DA; --danger:#B93A27; --none:#A9B3BF;
+  --fd:"Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fb:"Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1319; --surface:#171E27; --surface2:#1E2731; --ink:#E8EDF2; --muted:#8E9AA8; --line:#26313C;
+    --brand:#3DB5AC; --brand-ink:#08201E; --ai:#F2B23A; --ai-soft:#3A2F17; --danger:#F07A63; --none:#4E5B68; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1319; --surface:#171E27; --surface2:#1E2731; --ink:#E8EDF2; --muted:#8E9AA8; --line:#26313C;
+  --brand:#3DB5AC; --brand-ink:#08201E; --ai:#F2B23A; --ai-soft:#3A2F17; --danger:#F07A63; --none:#4E5B68; color-scheme: dark;
+}
+html{ scroll-padding-top: env(safe-area-inset-top, 0px); }
+*,*::before,*::after{ box-sizing: inherit; }
+body{ margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 var(--fb); -webkit-font-smoothing:antialiased; }
+button,input,select,textarea{ font:inherit; color:inherit; box-sizing:border-box; max-width:100%; }
+a{ color:var(--brand); }
+:focus-visible{ outline:2px solid var(--brand); outline-offset:2px; }
+[hidden]{ display:none !important; }
+.wrap{ max-width:960px; margin:0 auto; padding:0 16px 110px; }
+
+/* header */
+.top{ position:sticky; top:env(safe-area-inset-top, 0px); z-index:5; background:var(--bg); padding:12px 0 10px; }
+.titlebar{ display:flex; align-items:center; gap:8px; }
+.brand{ font:800 24px/1 var(--fd); letter-spacing:-.02em; margin:0; display:flex; align-items:center; gap:9px; }
+.logo{ width:30px; height:30px; flex:none; }
+.grow{ flex:1; }
+.count{ color:var(--muted); font-size:13.5px; margin:6px 0 12px; }
+.btn{ border:1px solid var(--line); background:var(--surface); border-radius:10px; padding:8px 12px; cursor:pointer; font-weight:600; font-size:14px; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; text-decoration:none; color:var(--ink); }
+.btn.primary{ background:var(--brand); color:var(--brand-ink); border-color:var(--brand); }
+.btn.ai{ background:var(--ai); color:#241800; border-color:var(--ai); }
+.btn.danger{ color:var(--danger); }
+.btn.big{ padding:12px 16px; font-size:15px; border-radius:12px; }
+.btn:disabled{ opacity:.5; cursor:default; }
+.iconbtn{ border:0; background:transparent; padding:7px; border-radius:9px; cursor:pointer; color:var(--muted); display:inline-flex; }
+.iconbtn:hover{ background:var(--surface2); color:var(--ink); }
+.link{ border:0; background:none; padding:4px 2px; color:var(--muted); font-size:14px; font-weight:600; cursor:pointer; text-decoration:none; }
+.link:hover{ color:var(--ink); }
+.link.danger{ color:var(--danger); }
+.tabs{ display:inline-grid; grid-template-columns:1fr 1fr 1fr; background:var(--surface2); border-radius:10px; padding:3px; gap:3px; }
+.tabs button{ border:0; background:transparent; border-radius:8px; padding:6px 16px; font-weight:600; font-size:14px; cursor:pointer; color:var(--muted); }
+.tabs button[aria-selected="true"]{ background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.08); }
+.chips{ display:flex; gap:6px; overflow-x:auto; margin-top:10px; padding-bottom:2px; scrollbar-width:none; }
+.chips::-webkit-scrollbar{ display:none; }
+.chip{ flex:none; border:0; background:var(--surface2); border-radius:999px; padding:5px 12px; cursor:pointer; font-size:13.5px; font-weight:500; display:inline-flex; align-items:center; gap:6px; }
+.chip i{ width:8px; height:8px; border-radius:50%; background:var(--c, var(--none)); }
+.chip[aria-pressed="true"]{ background:var(--ink); color:var(--bg); }
+.tools{ display:flex; gap:8px; margin-top:10px; align-items:center; }
+.search{ flex:1; border:0; background:var(--surface2); border-radius:10px; padding:9px 12px; min-width:0; }
+
+/* category shelves */
+.sec{ margin:14px 0 20px; }
+.sechead{ display:flex; align-items:baseline; gap:8px; margin-bottom:8px; }
+.sechead i{ width:10px; height:10px; border-radius:3px; flex:none; align-self:center; }
+.sechead h3{ font:700 17px/1.2 var(--fd); margin:0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sechead .n{ color:var(--muted); font-size:13.5px; flex:1; }
+.shelf{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; scroll-snap-type:x proximity; scrollbar-width:thin; }
+.viewhead{ display:flex; align-items:center; gap:10px; margin:14px 0 10px; }
+.viewhead h2{ font:700 19px/1.2 var(--fd); margin:0; flex:1; }
+
+/* tiles (reel-shaped previews) */
+.tile{ position:relative; flex:none; width:124px; aspect-ratio:3/4; border-radius:12px; overflow:hidden; color:#fff; background:hsl(var(--h) 30% 32%); scroll-snap-align:start; isolation:isolate; }
+.grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(112px, 1fr)); gap:6px; }
+.grid .tile{ width:auto; }
+.tile img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.tile .emb{ position:absolute; left:0; top:-22px; width:326px; height:760px; border:0; transform:scale(.38); transform-origin:0 0; pointer-events:none; background:transparent; }
+.grid .tile .emb{ transform:scale(.36); }
+.tile .txt{ position:absolute; top:11px; left:10px; right:10px; margin:0; font-size:12.5px; line-height:1.32; overflow:hidden; display:-webkit-box; -webkit-line-clamp:7; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+.grid .tile .txt{ -webkit-line-clamp:6; }
+.tile.pic::after{ content:""; position:absolute; inset:45% 0 0; background:linear-gradient(transparent, rgba(0,0,0,.65)); pointer-events:none; }
+.tile .who{ position:absolute; left:8px; right:30px; bottom:8px; z-index:1; font-size:11.5px; font-weight:600; white-space:nowrap; display:flex; align-items:center; gap:4px; }
+.tile .who > span{ overflow:hidden; text-overflow:ellipsis; }
+.tile .who i{ width:7px; height:7px; border-radius:50%; background:var(--c); flex:none; box-shadow:0 0 0 1.5px rgba(255,255,255,.7); }
+.tile .who svg{ width:11px; height:11px; flex:none; }
+.cover{ position:absolute; inset:0; z-index:2; border-radius:inherit; }
+.tile .more{ position:absolute; right:2px; bottom:2px; z-index:3; border:0; background:transparent; color:#fff; padding:5px; border-radius:8px; cursor:pointer; display:flex; }
+.tile .more svg{ width:16px; height:16px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+.tile .more:hover{ background:rgba(255,255,255,.15); }
+.tile.selecting{ cursor:pointer; }
+.tile.sel{ outline:3px solid var(--brand); outline-offset:-3px; }
+.tile .check{ position:absolute; top:7px; left:7px; z-index:2; width:22px; height:22px; border-radius:50%; border:2px solid #fff; display:grid; place-items:center; background:rgba(0,0,0,.25); }
+.tile.sel .check{ background:var(--brand); border-color:var(--brand); color:var(--brand-ink); }
+.more-btn{ margin:16px auto 0; display:block; }
+
+/* empty + notices */
+.empty{ padding:36px 0 20px; }
+.empty h2{ font:800 clamp(32px, 7vw, 52px)/1.02 var(--fd); letter-spacing:-.03em; margin:0 0 14px; max-width:14ch; }
+.steps{ list-style:none; padding:0; margin:0 0 24px; display:grid; gap:12px; max-width:62ch; counter-reset:s; color:var(--muted); }
+.steps li{ counter-increment:s; display:grid; grid-template-columns:32px 1fr; gap:10px; align-items:start; }
+.steps li::before{ content:counter(s); width:26px; height:26px; border-radius:50%; background:var(--ink); color:var(--bg); display:grid; place-items:center; font:700 13px/1 var(--fd); }
+.drop{ border:2px dashed var(--line); border-radius:16px; padding:28px 20px; text-align:center; background:var(--surface); }
+.drop.over{ border-color:var(--brand); }
+.drop p{ margin:10px 0 0; color:var(--muted); font-size:13.5px; }
+.notice{ display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:12px 0; font-size:14px; }
+.blank{ text-align:center; padding:48px 10px; color:var(--muted); }
+.toast{ position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); z-index:50; background:var(--ink); color:var(--bg); padding:10px 16px; border-radius:12px; font-size:14px; max-width:min(92vw, 520px); box-shadow:0 6px 20px rgba(0,0,0,.2); cursor:pointer; }
+.toast.err{ background:var(--danger); color:#fff; }
+
+/* sheets */
+.layer{ position:fixed; inset:0; z-index:20; display:flex; align-items:flex-end; justify-content:center; background:rgba(8,12,18,0); transition:background .2s; }
+.layer.on{ background:rgba(8,12,18,.45); }
+.sheet{ width:100%; max-width:540px; max-height:90%; overflow:auto; background:var(--surface); border-radius:20px 20px 0 0; padding:18px 18px calc(22px + env(safe-area-inset-bottom, 0px)); transform:translateY(24px); opacity:0; transition:transform .22s ease, opacity .22s ease; }
+.layer.on .sheet{ transform:none; opacity:1; }
+@media (min-width:720px){ .layer{ align-items:center; } .sheet{ border-radius:20px; padding-bottom:22px; } }
+.sheet h3{ font:700 21px/1.15 var(--fd); margin:0; overflow-wrap:anywhere; }
+.sheethead{ display:flex; align-items:flex-start; gap:12px; margin-bottom:14px; }
+.sheethead > div{ flex:1; min-width:0; }
+.sheet .sub{ color:var(--muted); font-size:14px; margin-top:3px; }
+.av{ width:40px; height:40px; border-radius:12px; display:grid; place-items:center; font:700 17px/1 var(--fd); color:#fff; background:hsl(var(--h) 30% 38%); text-transform:uppercase; flex:none; }
+.preview{ position:relative; width:100%; border-radius:14px; overflow:hidden; background:var(--surface2); margin-bottom:12px; }
+.preview img{ display:block; width:100%; max-height:360px; object-fit:contain; }
+.preview iframe{ display:block; width:100%; height:520px; border:0; }
+.field{ margin-top:16px; }
+.field > label, .field > .lbl{ display:block; font-weight:600; font-size:14px; margin-bottom:6px; }
+.field .hint{ color:var(--muted); font-size:13px; margin-top:5px; }
+select.input, input.input, textarea.input{ width:100%; border:1px solid var(--line); background:var(--surface2); border-radius:10px; padding:10px 12px; }
+textarea.input{ min-height:64px; resize:vertical; }
+.status{ margin-top:10px; font-size:13.5px; color:var(--muted); display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+details.more-info{ margin-top:12px; font-size:14px; }
+details.more-info summary{ cursor:pointer; font-weight:600; color:var(--muted); }
+details.more-info p{ white-space:pre-wrap; margin:8px 0 0; max-height:180px; overflow:auto; overflow-wrap:anywhere; }
+.tags{ display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+.tags span{ font-size:12.5px; background:var(--surface2); border-radius:6px; padding:2px 7px; color:var(--muted); }
+.watch{ width:100%; justify-content:center; }
+.seg{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.seg label{ border:1px solid var(--line); border-radius:12px; padding:10px; cursor:pointer; background:var(--surface2); position:relative; }
+.seg label b{ display:block; font:700 15px/1.2 var(--fd); }
+.seg label span{ display:block; font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.35; }
+.seg input{ position:absolute; opacity:0; pointer-events:none; }
+.seg label:has(input:checked){ border-color:var(--ai); background:var(--ai-soft); }
+.seg label:has(input:focus-visible){ outline:2px solid var(--brand); outline-offset:2px; }
+@media (max-width:440px){ .seg{ grid-template-columns:1fr; } }
+.tagbox{ display:flex; flex-wrap:wrap; gap:6px; border:1px solid var(--line); background:var(--surface2); border-radius:10px; padding:6px; }
+.tag{ display:inline-flex; align-items:center; gap:4px; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:3px 4px 3px 10px; font-size:13.5px; }
+.tag button{ border:0; background:transparent; cursor:pointer; color:var(--muted); padding:0 4px; font-size:16px; line-height:1; }
+.tagbox input{ flex:1; min-width:120px; border:0; background:transparent; padding:4px 6px; outline:none; }
+.radios{ display:flex; flex-direction:column; gap:6px; }
+.radios{ display:flex; flex-direction:column; gap:8px; }
+.radios label{ display:flex; gap:8px; align-items:center; font-size:14px; }
+.two{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (max-width:440px){ .two{ grid-template-columns:1fr; } }
+input[type=range]{ width:100%; accent-color:var(--ai); }
+.runbox{ margin-top:14px; font-size:14px; padding:10px 12px; border-radius:10px; background:var(--ai-soft); }
+.runbox.plain{ background:var(--surface2); }
+.runbox.err{ background:color-mix(in srgb, var(--danger) 14%, var(--surface)); }
+.prog{ height:6px; background:rgba(0,0,0,.08); border-radius:3px; overflow:hidden; margin-top:8px; }
+.prog > i{ display:block; height:100%; background:var(--ai); width:0; transition:width .3s; }
+.prog.indet > i{ width:30%; animation:slide 1.2s ease-in-out infinite; }
+@keyframes slide{ from{ transform:translateX(-100%);} to{ transform:translateX(340%);} }
+.actions{ display:flex; gap:8px; margin-top:20px; justify-content:flex-end; flex-wrap:wrap; }
+.selbar{ position:fixed; left:0; right:0; bottom:0; z-index:10; background:var(--surface); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
+.selbar .in{ max-width:960px; margin:0 auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.selbar .in b{ flex:1; white-space:nowrap; }
+.selbar select{ width:auto; max-width:170px; }
+.dialog{ position:fixed; inset:0; z-index:40; display:grid; place-items:center; background:rgba(8,12,18,.5); padding:20px; }
+.dialog .box{ background:var(--surface); border-radius:16px; padding:18px; width:100%; max-width:420px; }
+.dialog h4{ font:700 18px/1.2 var(--fd); margin:0 0 8px; }
+.dialog p{ margin:0 0 12px; color:var(--muted); font-size:14px; }
+.menu{ position:relative; }
+.pop{ position:absolute; right:0; top:calc(100% + 6px); background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:6px; width:250px; z-index:8; box-shadow:0 8px 24px rgba(0,0,0,.14); max-height:72vh; overflow:auto; }
+.pop button{ display:flex; gap:8px; align-items:center; width:100%; text-align:left; border:0; background:transparent; padding:9px 10px; border-radius:8px; cursor:pointer; font-size:14px; }
+.pop button:hover{ background:var(--surface2); }
+.pop button.danger{ color:var(--danger); }
+.pop hr{ border:0; border-top:1px solid var(--line); margin:6px 4px; }
+.pop .grp{ font-size:12.5px; color:var(--muted); padding:4px 10px 2px; }
+.pop .sync{ font-size:12px; color:var(--muted); padding:6px 10px 4px; }
+.pop button .ck{ width:16px; flex:none; color:var(--brand); }
+.chat{ display:flex; flex-direction:column; gap:14px; padding:12px 0 80px; }
+.msg{ font-size:14.5px; max-width:100%; }
+.msg.me{ align-self:flex-end; background:var(--brand); color:var(--brand-ink); padding:9px 14px; border-radius:18px 18px 4px 18px; max-width:82%; overflow-wrap:anywhere; }
+.msg.bot .say{ margin-bottom:8px; }
+.msg.bot .say.pending{ color:var(--muted); animation:pulse 1.4s ease-in-out infinite; }
+@keyframes pulse{ 50%{ opacity:.45; } }
+.msg .acts{ display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+.msg .acts .btn{ font-size:13px; padding:6px 11px; border-radius:999px; }
+.tile .more.add{ width:28px; height:28px; right:5px; bottom:5px; justify-content:center; align-items:center; background:var(--brand); color:var(--brand-ink); border-radius:50%; font-size:20px; font-weight:700; line-height:1; padding:0; }
+.askbar{ position:fixed; left:0; right:0; bottom:0; z-index:10; background:var(--bg); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
+.askbar .in{ max-width:960px; margin:0 auto; display:flex; gap:8px; }
+.askbar input{ flex:1; min-width:0; border:0; background:var(--surface2); border-radius:999px; padding:11px 16px; }
+.askbar .btn{ border-radius:999px; padding:10px 18px; }
+.keystat{ margin-top:8px; font-size:14px; color:var(--muted); min-height:20px; }
+.keystat.ok{ color:var(--brand); font-weight:600; }
+.keystat.bad{ color:var(--danger); }
+.keyline{ display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--surface2); border-radius:10px; padding:9px 12px; font-size:14px; margin-bottom:4px; overflow-wrap:anywhere; }
+.loading{ padding:60px 0; text-align:center; color:var(--muted); }
+@media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
+
+/* ================= Reelcall look: warm, playful, soft ================= */
+:root{
+  --bg:#F7F3FF; --surface:#FFFFFF; --surface2:#F0E9FF; --ink:#2B1F45; --muted:#7D7196; --line:#E7DFF8;
+  --brand:#FF5A7A; --brand-ink:#FFFFFF; --violet:#8B5CFF; --ai:#FFC24B; --ai-soft:#FFF3D6; --danger:#E5484D; --none:#B9AED0;
+  --grad:linear-gradient(135deg, #FF6B8B 0%, #A35BFF 100%);
+  --fd:"Gluten", "Figtree", ui-rounded, system-ui, sans-serif;
+  --fb:"Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --lift:0 10px 28px -12px rgba(76, 40, 140, .28);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#140F24; --surface:#1F1836; --surface2:#2A2147; --ink:#F5F0FF; --muted:#A99DC6; --line:#342A55;
+    --brand:#FF6F8E; --brand-ink:#FFFFFF; --violet:#A585FF; --ai:#FFC24B; --ai-soft:#3A2E1A; --danger:#FF7A7F; --none:#5B4F7A;
+    --lift:0 12px 30px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#140F24; --surface:#1F1836; --surface2:#2A2147; --ink:#F5F0FF; --muted:#A99DC6; --line:#342A55;
+  --brand:#FF6F8E; --brand-ink:#FFFFFF; --violet:#A585FF; --ai:#FFC24B; --ai-soft:#3A2E1A; --danger:#FF7A7F; --none:#5B4F7A;
+  --lift:0 12px 30px -12px rgba(0,0,0,.6);
+}
+body{ font-size:15.5px; background:var(--bg); }
+.brand{ font:700 27px/1 var(--fd); letter-spacing:0; gap:10px; }
+.logo{ width:36px; height:36px; filter:drop-shadow(0 4px 10px rgba(163,91,255,.35)); }
+.count{ font-size:14px; margin:8px 0 14px; }
+
+.btn{ border:0; background:var(--surface2); border-radius:999px; padding:9px 16px; font-weight:700; transition:transform .12s ease; }
+.btn:active{ transform:scale(.97); }
+.btn.primary{ background:var(--brand); color:#fff; box-shadow:0 8px 18px -8px var(--brand); }
+.btn.ai{ background:var(--grad); color:#fff; box-shadow:0 10px 22px -10px #A35BFF; }
+.btn.danger{ background:transparent; color:var(--danger); }
+.iconbtn{ border-radius:999px; }
+.link{ color:var(--violet); font-weight:700; }
+.link.danger{ color:var(--danger); }
+
+.tabs{ background:var(--surface2); border-radius:999px; padding:4px; }
+.tabs button{ border-radius:999px; padding:7px 18px; font-weight:700; }
+.tabs button[aria-selected="true"]{ background:var(--surface); color:var(--ink); box-shadow:0 4px 12px -4px rgba(76,40,140,.25); }
+.chip{ background:var(--surface); border-radius:999px; padding:6px 13px; font-weight:600; box-shadow:0 1px 0 var(--line); }
+.chip i{ width:9px; height:9px; }
+.chip[aria-pressed="true"]{ background:var(--ink); color:var(--bg); }
+.search{ background:var(--surface); border-radius:999px; padding:10px 16px; box-shadow:inset 0 0 0 1px var(--line); }
+
+.sec{ margin:16px 0 24px; }
+.sechead{ align-items:center; margin-bottom:10px; }
+.sechead i{ width:12px; height:12px; border-radius:50%; box-shadow:0 0 0 4px color-mix(in srgb, currentColor 0%, transparent); }
+.sechead h3{ font:700 20px/1.2 var(--fd); }
+.sechead .n{ flex:none; margin-right:auto; background:var(--surface2); color:var(--muted); border-radius:999px; padding:1px 9px; font-size:12.5px; font-weight:700; }
+.shelf{ gap:10px; padding:2px 2px 12px; scrollbar-width:none; }
+.shelf::-webkit-scrollbar{ display:none; }
+.viewhead h2{ font:700 22px/1.2 var(--fd); }
+
+.tile{ width:132px; border-radius:20px; color:#fff;
+  background:linear-gradient(155deg, hsl(var(--h) 76% 62%) 0%, hsl(calc(var(--h) + 34) 70% 48%) 100%);
+  box-shadow:0 10px 20px -12px hsl(var(--h) 60% 35% / .8); }
+.grid{ grid-template-columns:repeat(auto-fill, minmax(112px, 1fr)); gap:10px; }
+.tile .txt{ font-size:13px; font-weight:600; line-height:1.3; text-shadow:0 1px 2px rgba(0,0,0,.18); }
+.tile .who{ font-weight:700; }
+.tile .who i{ box-shadow:0 0 0 2px #fff; }
+.tile.sel{ outline:3px solid var(--violet); }
+.tile.sel .check{ background:var(--violet); border-color:var(--violet); }
+.tile .more.add{ background:#fff; color:var(--violet); }
+
+.empty{ padding:24px 0 20px; text-align:center; }
+.empty h2{ font:700 clamp(34px, 9vw, 54px)/1.05 var(--fd); letter-spacing:0; margin:6px auto 18px; max-width:12ch; }
+.empty .steps{ text-align:left; margin:0 auto 24px; }
+.steps li::before{ background:var(--grad); color:#fff; }
+.drop{ border:2px dashed color-mix(in srgb, var(--violet) 45%, transparent); border-radius:24px; background:var(--surface); }
+.fan{ position:relative; height:150px; margin:8px auto 4px; width:220px; }
+.fan span{ position:absolute; left:50%; top:10px; width:86px; height:118px; border-radius:18px; margin-left:-43px;
+  background:linear-gradient(155deg, hsl(var(--h) 80% 68%), hsl(calc(var(--h) + 38) 72% 52%)); box-shadow:var(--lift); }
+.fan span:nth-child(1){ transform:translateX(-58px) rotate(-12deg); }
+.fan span:nth-child(2){ transform:translateY(-8px); z-index:1; }
+.fan span:nth-child(3){ transform:translateX(58px) rotate(12deg); }
+.fan span::after{ content:""; position:absolute; left:50%; top:50%; margin:-12px 0 0 -8px; border-left:20px solid rgba(255,255,255,.95); border-top:12px solid transparent; border-bottom:12px solid transparent; }
+@media (prefers-reduced-motion: no-preference){
+  .fan span:nth-child(1){ animation:fanL .7s cubic-bezier(.2,.9,.3,1.3) both; }
+  .fan span:nth-child(3){ animation:fanR .7s cubic-bezier(.2,.9,.3,1.3) both; }
+  @keyframes fanL{ from{ transform:translateX(0) rotate(0); } }
+  @keyframes fanR{ from{ transform:translateX(0) rotate(0); } }
+}
+
+.notice{ border:0; border-radius:20px; background:var(--surface); box-shadow:var(--lift); padding:14px 16px; }
+.toast{ border-radius:999px; background:var(--ink); color:var(--bg); padding:11px 18px; font-weight:600; }
+.toast.err{ background:var(--danger); }
+
+.layer.on{ background:rgba(20,12,40,.45); backdrop-filter:blur(3px); }
+.sheet{ border-radius:28px 28px 0 0; padding-top:12px; }
+.sheet::before{ content:""; display:block; width:42px; height:5px; border-radius:3px; background:var(--line); margin:0 auto 14px; }
+@media (min-width:720px){ .sheet{ border-radius:28px; } }
+.sheet h3{ font:700 23px/1.15 var(--fd); }
+.av{ border-radius:14px; background:linear-gradient(155deg, hsl(var(--h) 78% 64%), hsl(calc(var(--h) + 38) 72% 50%)); }
+select.input, input.input, textarea.input{ border-radius:14px; background:var(--surface2); border:1px solid transparent; }
+select.input:focus, input.input:focus, textarea.input:focus{ outline:none; border-color:var(--violet); background:var(--surface); }
+.seg label{ border-radius:18px; border:2px solid transparent; background:var(--surface2); }
+.seg label b{ font:700 16px/1.2 var(--fd); }
+.seg label:has(input:checked){ border-color:var(--violet); background:color-mix(in srgb, var(--violet) 12%, var(--surface)); }
+input[type=range]{ accent-color:var(--violet); }
+.keyline, .runbox{ border-radius:16px; }
+.prog > i{ background:var(--grad); }
+.keystat.ok{ color:var(--violet); }
+.preview{ border-radius:20px; }
+.tags span{ border-radius:999px; padding:2px 9px; }
+
+.msg.me{ background:var(--grad); color:#fff; border-radius:20px 20px 6px 20px; }
+.msg .acts .btn{ background:var(--surface); box-shadow:inset 0 0 0 1px var(--line); }
+.askbar{ background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(10px); border-top:0; }
+.askbar input{ background:var(--surface); box-shadow:inset 0 0 0 1px var(--line); }
+.askbar .btn{ background:var(--grad); color:#fff; }
+.selbar{ border-radius:22px 22px 0 0; border-top:0; box-shadow:0 -10px 30px -12px rgba(76,40,140,.3); }
+.pop{ border:0; border-radius:20px; box-shadow:var(--lift), 0 0 0 1px var(--line); }
+.pop button{ border-radius:12px; font-weight:600; }
+.dialog .box{ border-radius:24px; }
+.dialog h4{ font:700 20px/1.2 var(--fd); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top" id="top"></header>
+  <main id="main"><div class="loading">Loading your saves…</div></main>
+</div>
+<div class="selbar" id="selbar" hidden></div>
+<div class="askbar" id="askbar" hidden></div>
+<div class="layer" id="layer" hidden><section class="sheet" id="sheet" role="dialog" aria-modal="true"></section></div>
+<div class="dialog" id="dialog" hidden><div class="box" id="dialogbox" role="alertdialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" hidden role="status"></div>
+<input type="file" id="file" accept=".json,.zip,.html,.htm,application/json,application/zip,text/html,image/*" multiple hidden>
+<script>
+(() => {
+"use strict";
+const PRISTINE = "<!doctype html>\n" + document.documentElement.outerHTML;     // this app, before anything is drawn
+const MARK_A = "<!-" + "-savesort-data-" + "->", MARK_B = "<!-" + "-/savesort-data-" + "->";   // split so the code never matches itself
+const MARK_RE = new RegExp(MARK_A + "[\\s\\S]*?" + MARK_B, "g");
+function libraryFromHtml(text){
+  const a = text.indexOf(MARK_A), b = text.indexOf(MARK_B);
+  if (a < 0 || b < a) return null;
+  const m = text.slice(a, b).match(/<script[^>]*>([\s\S]*)<\/script>/);
+  try { return m ? JSON.parse(m[1]) : null; } catch { return null; }
+}
+const EMBEDDED = libraryFromHtml(PRISTINE);
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const PALETTE = ["#E4572E","#2E86AB","#A23B72","#D98A00","#3B8C3B","#6C5CE7","#1B998B","#D45D79","#8A6E4B","#4F6D7A","#B5838D","#5E8C31"];
+const CHUNK = 100;
+const POST_RE = /instagram\.com\/(?:[A-Za-z0-9._]+\/)?(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/;
+const ICON = {
+  reel: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg>',
+  post: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
+  play: '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>',
+  close: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  dots: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+  pen: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>',
+  tick: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>'
+};
+const hue = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; h %= 300; return h < 40 ? h : h + 60; };
+const newId = p => p + Math.random().toString(36).slice(2, 9);
+const nowS = () => Math.floor(Date.now() / 1000);
+const fmtDate = s => { if (!s) return ""; try { return new Date(s * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }); } catch { return ""; } };
+const plural = (n, w, pl) => n.toLocaleString() + " " + (n === 1 ? w : (pl || w + "s"));
+const clean = x => JSON.parse(JSON.stringify(x));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const NATIVE = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
+// Outside claude.ai (APK, your own website, or a local file) the app uses your own AI key, browser storage and Instagram's embed previews.
+const OWNKEY = NATIVE || !(window.claude && typeof window.claude.use === "function");
+const AIK = "savesort:ai";
+const aiCfg = () => { try { return Object.assign({ provider: "gemini", key: "", model: "", base: "" }, JSON.parse(localStorage.getItem(AIK) || "{}")); } catch { return { provider: "gemini", key: "", model: "", base: "" }; } };
+const setAiCfg = c => { try { localStorage.setItem(AIK, JSON.stringify(c)); } catch {} };
+// Any AI service: Gemini and Claude natively, everything else through the OpenAI-compatible chat API.
+const PROVIDERS = {
+  gemini: { name: "Google Gemini", def: "gemini-flash-latest", web: true },
+  claude: { name: "Claude", def: "claude-haiku-4-5", web: true },
+  openai: { name: "OpenAI", base: "https://api.openai.com/v1", def: "gpt-4o-mini" },
+  openrouter: { name: "OpenRouter", base: "https://openrouter.ai/api/v1", def: "openrouter/auto", web: true },
+  groq: { name: "Groq", base: "https://api.groq.com/openai/v1", def: "llama-3.3-70b-versatile" },
+  deepseek: { name: "DeepSeek", base: "https://api.deepseek.com/v1", def: "deepseek-chat" },
+  xai: { name: "xAI Grok", base: "https://api.x.ai/v1", def: "grok-3-mini" },
+  perplexity: { name: "Perplexity", base: "https://api.perplexity.ai", def: "sonar", web: true, noList: true },
+  mistral: { name: "Mistral", base: "https://api.mistral.ai/v1", def: "mistral-small-latest" },
+  together: { name: "Together AI", base: "https://api.together.xyz/v1", def: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
+  cerebras: { name: "Cerebras", base: "https://api.cerebras.ai/v1", def: "llama-3.3-70b" },
+  fireworks: { name: "Fireworks", base: "https://api.fireworks.ai/inference/v1", def: "accounts/fireworks/models/llama-v3p3-70b-instruct" },
+  huggingface: { name: "Hugging Face", base: "https://router.huggingface.co/v1", def: "meta-llama/Llama-3.3-70B-Instruct" },
+  nvidia: { name: "NVIDIA", base: "https://integrate.api.nvidia.com/v1", def: "meta/llama-3.3-70b-instruct" },
+  deepinfra: { name: "DeepInfra", base: "https://api.deepinfra.com/v1/openai", def: "meta-llama/Llama-3.3-70B-Instruct" },
+  cohere: { name: "Cohere", base: "https://api.cohere.ai/compatibility/v1", def: "command-a-03-2025" },
+  custom: { name: "Other (OpenAI-compatible)", base: "", def: "" }
+};
+const PREFIXES = [[/^AIza/, ["gemini"]], [/^sk-ant-/, ["claude"]], [/^sk-or-/, ["openrouter"]], [/^gsk_/, ["groq"]], [/^xai-/, ["xai"]], [/^pplx-/, ["perplexity"]],
+  [/^csk-/, ["cerebras"]], [/^fw_/, ["fireworks"]], [/^hf_/, ["huggingface"]], [/^nvapi-/, ["nvidia"]], [/^sk-/, ["openai", "deepseek"]]];
+const detectProviders = key => { for (const [re, list] of PREFIXES) if (re.test(key)) return list; return []; };
+const baseOf = c => (c.provider === "custom" ? c.base : (PROVIDERS[c.provider] || {}).base || "").replace(/\/+$/, "");
+const modelOf = c => (c.model || "").trim() || (PROVIDERS[c.provider] || {}).def || "";
+const canWebSearch = c => !!(c.key && (PROVIDERS[c.provider] || {}).web);
+const provName = c => (PROVIDERS[c.provider] || { name: c.provider }).name + (modelOf(c) ? " (" + modelOf(c) + ")" : "");
+async function apiCall(c, url, init){
+  try { const r = await fetch(url, init); return { r, j: await r.json().catch(() => ({})) }; }
+  catch (e) {
+    if (e && e.name === "AbortError") throw { code: "cancelled" };
+    throw { code: "network", message: (PROVIDERS[c.provider] || {}).name || "the AI service" };
+  }
+}
+async function apiSample(prompt, o = {}){
+  const c = aiCfg(); if (!c.key) throw { code: "no_key" };
+  const model = modelOf(c), json = b => JSON.stringify(b);
+  let res;
+  if (c.provider === "gemini")
+    res = await apiCall(c, "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", { method: "POST", signal: o.signal,
+      headers: { "content-type": "application/json", "x-goog-api-key": c.key },
+      body: json(Object.assign({ contents: [{ role: "user", parts: [{ text: prompt }] }] }, o.web ? { tools: [{ google_search: {} }], generationConfig: { temperature: 0.2 } } : { generationConfig: { temperature: 0.2, responseMimeType: "application/json" } })) });
+  else if (c.provider === "claude")
+    res = await apiCall(c, "https://api.anthropic.com/v1/messages", { method: "POST", signal: o.signal,
+      headers: { "content-type": "application/json", "x-api-key": c.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: json(Object.assign({ model, max_tokens: 8000, messages: [{ role: "user", content: prompt }] }, o.web ? { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }] } : {})) });
+  else {
+    const base = baseOf(c); if (!base) throw { code: "bad_key", message: "Add the service's API address (base URL)." };
+    res = await apiCall(c, base + "/chat/completions", { method: "POST", signal: o.signal,
+      headers: Object.assign({ "content-type": "application/json", Authorization: "Bearer " + c.key }, c.provider === "openrouter" ? { "X-Title": "Reelcall" } : {}),
+      body: json({ model: c.provider === "openrouter" && o.web && !/:online$/.test(model) ? model + ":online" : model, messages: [{ role: "user", content: prompt }], temperature: 0.2 }) });
+  }
+  const { r, j } = res;
+  if (!r.ok){
+    const err = j.error || j, msg = (typeof err === "string" ? err : err.message || err.type || err.detail) || ("HTTP " + r.status);
+    throw { code: r.status === 429 ? "rate_limited" : [400, 401, 403, 404, 422].includes(r.status) ? "bad_key" : "upstream_error", message: String(msg) };
+  }
+  const text = c.provider === "claude" ? (j.content || []).map(x => x.text || "").join("")
+    : c.provider === "gemini" ? (((j.candidates || [])[0] || {}).content || { parts: [] }).parts.map(x => x.text || "").join("")
+    : (((j.choices || [])[0] || {}).message || {}).content || "";
+  if (!String(text).trim()) throw { code: "empty_completion" };
+  return { text: String(text) };
+}
+async function listModels(c){
+  const P = PROVIDERS[c.provider] || {};
+  if (P.noList) return [];
+  let res;
+  if (c.provider === "gemini") res = await apiCall(c, "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": c.key } });
+  else if (c.provider === "claude") res = await apiCall(c, "https://api.anthropic.com/v1/models?limit=100", { headers: { "x-api-key": c.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" } });
+  else res = await apiCall(c, baseOf(c) + "/models", { headers: { Authorization: "Bearer " + c.key } });
+  const { r, j } = res;
+  if (!r.ok) throw { code: r.status === 429 ? "rate_limited" : [401, 403].includes(r.status) ? "bad_key" : "list_failed", message: ((j.error && j.error.message) || "HTTP " + r.status) };
+  if (c.provider === "gemini") return (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes("generateContent")).map(m => m.name.replace(/^models\//, ""));
+  const arr = Array.isArray(j) ? j : j.data || j.models || [];
+  return arr.map(m => typeof m === "string" ? m : m.id || m.name).filter(Boolean);
+}
+function chooseModel(provider, ids){
+  const P = PROVIDERS[provider] || {};
+  if (!ids.length) return P.def || "";
+  if (P.def && ids.includes(P.def)) return P.def;
+  const skip = /(embed|whisper|tts|audio|image|vision|moderation|realtime|guard|rerank|transcribe|dall-e|sora|ocr|live|thinking|exp)/i;
+  const usable = ids.filter(i => !skip.test(i));
+  if (provider === "gemini"){
+    const ok = usable.filter(n => /flash/.test(n)); if (ok.includes("gemini-flash-latest")) return "gemini-flash-latest";
+    const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0), odd = n => /lite|preview/.test(n) ? 1 : 0;
+    ok.sort((x, y) => ver(y) - ver(x) || odd(x) - odd(y) || x.length - y.length); return ok[0] || P.def;
+  }
+  if (provider === "claude") return usable.find(i => /haiku/.test(i)) || usable.find(i => /sonnet/.test(i)) || usable[0] || P.def;
+  if (provider === "openai"){
+    const ver = i => parseFloat(i.slice(4)) || 0, minis = usable.filter(i => /^gpt-\d+(\.\d+)?o?-mini$/.test(i)).sort((x, y) => ver(y) - ver(x));
+    return minis[0] || usable.find(i => /^gpt-/.test(i)) || P.def;
+  }
+  if (provider === "openrouter") return usable.find(i => /gemini.*flash/.test(i) && !/:free/.test(i)) || usable.find(i => /gpt.*mini/.test(i)) || P.def;
+  for (const re of [/flash/i, /mini/i, /versatile|70b/i, /small/i, /chat/i, /turbo|instant/i]){ const m = usable.find(i => re.test(i)); if (m) return m; }
+  return usable[0] || P.def;
+}
+const cleanKey = raw => String(raw || "").trim().replace(/^["']|["']$/g, "").replace(/^Bearer\s+/i, "");
+async function connectKey({ key: raw, provider: choice, model, base }){
+  const key = cleanKey(raw);
+  if (!key) throw new Error("Paste a key first.");
+  const cands = choice && choice !== "auto" ? [choice] : detectProviders(key);
+  if (!cands.length){ const e = new Error("Which service is this key from? Pick it in the list above."); e.pick = true; throw e; }
+  if (cands.includes("custom") && !/^https?:\/\//.test(String(base || "").trim())) throw new Error("Add the service's API address, like https://api.example.com/v1");
+  let last = null;
+  for (const provider of cands){
+    const cfg = { provider, key, model: "", base: provider === "custom" ? String(base).trim() : "" };
+    try {
+      let ids = [];
+      try { ids = await listModels(cfg); } catch (e) { if (e.code === "bad_key" || e.code === "network") throw e; }
+      cfg.model = String(model || "").trim() || chooseModel(provider, ids);
+      if (!cfg.model) throw { code: "bad_key", message: "Type a model name under Model." };
+      setAiCfg(cfg);
+      try { await apiSample('Reply with only this JSON: {"ok":true}'); }
+      catch (e) { if (e && e.code === "rate_limited") return cfg; throw e; }
+      return cfg;
+    } catch (e) { last = e; }
+  }
+  setAiCfg(Object.assign(aiCfg(), { key: "" }));
+  const e = last || {};
+  throw new Error(e.code === "network" ? "Couldn't reach " + e.message + ". Check your internet. If you're in a browser, this service may block browser apps; it will work in the Android app, or use a Gemini or OpenRouter key here."
+    : e.code === "bad_key" ? "The key or model was rejected: " + String(e.message || "").slice(0, 180)
+    : "Couldn't connect (" + String(e.message || e.code || "unknown error").slice(0, 120) + ").");
+}
+function openKeySheet(after){
+  const c = aiCfg();
+  const opts = '<option value="auto">Auto-detect from the key</option>' + Object.entries(PROVIDERS).map(([id, P]) => '<option value="' + id + '">' + esc(P.name) + '</option>').join("");
+  openSheet("key",
+    '<div class="sheethead"><div><h3>AI key</h3><div class="sub">Paste a key from any AI service. Gemini keys are free. It stays on this device.</div></div><button class="iconbtn" data-act="close" aria-label="Close">' + ICON.close + '</button></div>' +
+    '<input class="input" id="keyIn" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your API key" value="' + esc(c.key) + '">' +
+    '<div class="keystat' + (c.key ? " ok" : "") + '" id="keyStat">' + (c.key ? "Connected: " + esc(provName(c)) : "") + '</div>' +
+    '<details class="more-info" id="advanced"' + (c.provider === "custom" ? " open" : "") + '><summary>Service and model</summary>' +
+      '<div class="field"><label for="provIn">Service</label><select class="input" id="provIn">' + opts + '</select></div>' +
+      '<div class="field" id="baseRow"' + (c.provider === "custom" ? "" : " hidden") + '><label for="baseIn">API address</label><input class="input" id="baseIn" placeholder="https://api.example.com/v1" value="' + esc(c.base) + '"></div>' +
+      '<div class="field"><label for="modelIn">Model</label><input class="input" id="modelIn" placeholder="Picked automatically" value=""></div></details>' +
+    '<p class="sub" style="margin-top:14px">Works with Gemini, Claude, OpenAI, OpenRouter, Groq, DeepSeek, Grok, Perplexity, Mistral and more. Free key: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a></p>' +
+    '<div class="actions">' + (c.key ? '<button class="btn danger" data-act="forget">Remove key</button>' : '') + '<button class="btn primary" data-act="connect">Connect</button></div>',
+    s => {
+      const inp = $("#keyIn", s), go = s.querySelector('[data-act="connect"]'), st = $("#keyStat", s), prov = $("#provIn", s);
+      prov.value = c.key && c.provider === "custom" ? "custom" : "auto";
+      prov.onchange = () => { $("#baseRow", s).hidden = prov.value !== "custom"; };
+      const connect = async () => {
+        go.disabled = true; st.className = "keystat"; st.textContent = "Checking your key…";
+        try {
+          const c2 = await connectKey({ key: inp.value, provider: prov.value, model: $("#modelIn", s).value, base: $("#baseIn", s).value });
+          st.className = "keystat ok"; st.textContent = "Connected: " + provName(c2); aiAvailable = true; samplePromise = null; render();
+          setTimeout(() => { if (sheetKind === "key"){ closeSheet(); if (after) setTimeout(after, 250); } }, 900);
+        } catch (err) {
+          st.className = "keystat bad"; st.textContent = err.message || String(err);
+          if (err.pick){ $("#advanced", s).open = true; prov.focus(); }
+        }
+        go.disabled = false;
+      };
+      inp.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); connect(); } };
+      inp.onpaste = () => setTimeout(connect, 60);
+      s.onclick = e => {
+        const a = e.target.closest("[data-act]"); if (!a) return;
+        if (a.dataset.act === "close") closeSheet();
+        if (a.dataset.act === "connect") connect();
+        if (a.dataset.act === "forget"){ setAiCfg({ provider: "gemini", key: "", model: "", base: "" }); closeSheet(); render(); toast("Key removed"); }
+      };
+      setTimeout(() => inp.focus(), 60);
+    });
+}
+function openExternal(url){
+  const P = window.Capacitor && window.Capacitor.Plugins;
+  if (P && P.AppLauncher) P.AppLauncher.openUrl({ url }).catch(() => window.open(url, "_system")); else window.open(url, "_system");
+}
+const defaults = () => ({ mode: "auto", threshold: 0.6, scope: "unsorted", limit: 100, userCats: [] });
+
+const state = { libs: [], lib: null, posts: [], cats: [], settings: defaults(), colImported: false, imports: [],
+  view: "cats", filter: "all", query: "", selecting: false, selected: new Set(), shown: 150, loaded: false, chat: [] };
+const run = { active: false, ctl: null, label: "", frac: null, msg: null, err: false };
+let store = null, savedChunkCount = 0, syncState = "idle", aiAvailable = false, downloadsNS = null, assetsNS = null;
+
+const catById = id => state.cats.find(c => c.id === id);
+const nextColor = () => { const used = new Set(state.cats.map(c => c.color)); return PALETTE.find(c => !used.has(c)) || PALETTE[state.cats.length % PALETTE.length]; };
+function ensureCat(name, src){
+  const n = String(name).trim().slice(0, 40);
+  if (!n || n.toLowerCase() === "uncategorized") return null;
+  let c = state.cats.find(c => c.name.toLowerCase() === n.toLowerCase());
+  if (!c){ c = { id: newId("c_"), name: n, color: nextColor(), src }; state.cats.push(c); markMeta(); }
+  return c;
+}
+const countBy = () => { const m = new Map(); for (const p of state.posts) m.set(p.c || null, (m.get(p.c || null) || 0) + 1); return m; };
+const newestSaved = () => state.posts.reduce((m, p) => (!p.est && p.s > m ? p.s : m), 0);
+
+/* ---------- storage: simple key/value docs ---------- */
+function dbStore(db, uid){
+  const col = db.collection("data/users/" + uid);
+  return { kind: "cloud",
+    async get(k){ const s = await col.doc(k).get(); return s.exists ? clean(s.data()) : null; },  // snapshots are frozen: clone before editing
+    set: (k, v) => col.doc(k).set(v), del: k => col.doc(k).delete() };
+}
+function lsStore(){
+  const K = "savesort:v1:"; let ok = false;
+  try { localStorage.setItem(K + "t", "1"); localStorage.removeItem(K + "t"); ok = true; } catch {}
+  return { kind: ok ? "device" : "memory",
+    async get(k){ if (!ok) return null; try { return JSON.parse(localStorage.getItem(K + k) || "null"); } catch { return null; } },
+    async set(k, v){ if (ok) localStorage.setItem(K + k, JSON.stringify(v)); },
+    async del(k){ if (ok) localStorage.removeItem(K + k); } };
+}
+async function pickStore(){
+  const c = window.claude;
+  if (c && typeof c.use === "function"){
+    try { const [db, user] = await Promise.all([c.use("db"), c.use("user")]);
+      if (db && user){ const uid = await user.id(); if (uid) return dbStore(db, uid); } } catch {}
+  }
+  return lsStore();
+}
+const key = (lib, k) => "L_" + lib + "_" + k;
+const dirty = { meta: false, all: false, chunks: new Set() };
+let flushTimer = null, flushing = false;
+const schedule = () => { clearTimeout(flushTimer); flushTimer = setTimeout(flush, 700); };
+const touch = () => { state.fileDirty = true; };
+const markMeta = () => { touch(); dirty.meta = true; schedule(); };
+const markAll = () => { touch(); dirty.all = true; dirty.meta = true; schedule(); };
+const markPost = p => { touch(); dirty.meta = true; const i = state.posts.indexOf(p); if (i >= 0) dirty.chunks.add(Math.floor(i / CHUNK)); schedule(); };
+async function flush(){
+  if (!store || !state.lib) return;
+  if (flushing){ schedule(); return; }
+  flushing = true; setSync("saving");
+  const id = state.lib.id, n = Math.ceil(state.posts.length / CHUNK);
+  const chunks = dirty.all ? [...Array(n).keys()] : [...dirty.chunks];
+  const wantMeta = dirty.meta || n !== savedChunkCount;
+  dirty.all = false; dirty.meta = false; dirty.chunks.clear();
+  try {
+    for (const i of chunks) if (i < n) await store.set(key(id, "c_" + i), { posts: clean(state.posts.slice(i * CHUNK, (i + 1) * CHUNK)) });
+    if (wantMeta){ state.savedAt = nowS(); await store.set(key(id, "meta"), clean({ v: 2, chunkCount: n, cats: state.cats, settings: state.settings, colImported: state.colImported, imports: state.imports, savedAt: state.savedAt, fileDirty: !!state.fileDirty })); }
+    for (let i = n; i < savedChunkCount; i++) await store.del(key(id, "c_" + i));
+    savedChunkCount = n; setSync("saved");
+  } catch { dirty.all = true; dirty.meta = true; setSync("error"); }
+  finally { flushing = false; }
+}
+async function flushNow(){ clearTimeout(flushTimer); while (flushing) await sleep(80); if (dirty.all || dirty.meta || dirty.chunks.size) await flush(); }
+const saveLibs = () => store.set("libs", clean({ list: state.libs, current: state.lib ? state.lib.id : null })).catch(() => setSync("error"));
+function resetLibState(){
+  Object.assign(state, { posts: [], cats: [], settings: defaults(), colImported: false, imports: [], filter: "all", view: "cats", selecting: false, query: "", shown: 150 });
+  state.selected.clear(); savedChunkCount = 0;
+}
+async function loadLib(lib){
+  state.lib = lib; resetLibState();
+  const m = await store.get(key(lib.id, "meta"));
+  if (!m) return;
+  const posts = [];
+  for (let i = 0; i < (m.chunkCount || 0); i++){ const c = await store.get(key(lib.id, "c_" + i)); if (c) posts.push(...(c.posts || [])); }
+  state.posts = posts; state.cats = m.cats || []; state.settings = Object.assign(defaults(), m.settings || {});
+  state.colImported = !!m.colImported; state.imports = m.imports || []; savedChunkCount = m.chunkCount || 0;
+  state.savedAt = m.savedAt || 0; state.fileDirty = !!m.fileDirty;
+}
+async function createLib(name){
+  const lib = { id: newId("l"), name, created: nowS() };
+  state.libs.push(lib); state.lib = lib; resetLibState(); await saveLibs(); return lib;
+}
+async function switchLib(id){
+  if (run.active || (state.lib && state.lib.id === id)) return;
+  await flushNow(); const lib = state.libs.find(l => l.id === id); if (!lib) return;
+  await loadLib(lib); await saveLibs(); render();
+}
+function setSync(s){ const was = syncState; syncState = s; const el = $("#sync"); if (el) el.outerHTML = syncHtml(); if (s === "error" && was !== "error") toast("Couldn't save your changes. They'll retry on your next edit.", true); }
+function syncHtml(){
+  const t = !store ? "" : syncState === "error" ? "Not saved yet" : syncState === "saving" ? "Saving…" : store.kind === "cloud" ? "Saved to your Claude account" : store.kind === "device" ? "Saved on this device" : "Not saved: storage unavailable";
+  return '<div class="sync" id="sync">' + t + '</div>';
+}
+
+/* ---------- import ---------- */
+function scan(node, depth, fn){
+  if (depth < 0 || node == null) return;
+  if (Array.isArray(node)){ for (const n of node) scan(n, depth - 1, fn); return; }
+  if (typeof node === "object") for (const [k, v] of Object.entries(node)){ if (v !== null && typeof v === "object") scan(v, depth - 1, fn); else fn(k, v, node); }
+}
+function entryInfo(obj){
+  const urls = new Set(); let url = null, ts = null, cap = null, owner = null;
+  scan(obj, 3, (k, v, parent) => {
+    if (typeof v === "string"){
+      const m = v.match(POST_RE);
+      if (m){ urls.add(m[2]); if (!url) url = v; return; }
+      if (!cap && /^(caption|description|text)$/i.test(k) && v.trim()) cap = v;
+      else if (!owner && /^(owner|username|author|user|creator)$/i.test(k)) owner = v;
+      else if (!owner && k === "value" && typeof parent.label === "string" && /user|owner|author/i.test(parent.label)) owner = v;
+    } else if (typeof v === "number" && ts == null && /^(timestamp|taken_at|saved_at|savedat)$/i.test(k)) ts = v;
+  });
+  return { count: urls.size, url, ts, cap, owner };
+}
+function fixText(t){
+  if (typeof t !== "string" || !/[\u0080-\u00ff]/.test(t) || /[^\u0000-\u00ff]/.test(t)) return t;
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(t, c => c.charCodeAt(0))); } catch { return t; }
+}
+function fromLabelValues(node){
+  let url = null, cap = null, owner = null, on = null, h = [];
+  for (const it of node.label_values){
+    if (!it || typeof it !== "object") continue;
+    const v = typeof it.href === "string" && POST_RE.test(it.href) ? it.href : it.value;
+    if (it.label === "URL" && typeof v === "string" && POST_RE.test(v)){ url = url || v; continue; }
+    if (it.label === "Caption" && !cap && typeof it.value === "string" && it.value.trim()){ cap = fixText(it.value); continue; }
+    const sub = Array.isArray(it.dict) ? it.dict.flatMap(d => (d && Array.isArray(d.dict)) ? d.dict : []) : [];
+    if (it.title === "Hashtags") h = sub.filter(x => x.label === "Name" && x.value).map(x => fixText(String(x.value)));
+    if (it.title === "Owner") for (const x of sub){ if (x.label === "Username" && x.value) owner = String(x.value); if (x.label === "Name" && x.value) on = fixText(String(x.value)); }
+  }
+  return url ? { url, cap, owner, on, h } : null;
+}
+function deepCount(node, seen = new Set()){
+  if (seen.size > 1 || node == null) return seen.size;
+  if (typeof node === "string"){ const m = node.match(POST_RE); if (m) seen.add(m[2]); return seen.size; }
+  if (typeof node === "object") for (const v of Object.values(node)){ deepCount(v, seen); if (seen.size > 1) break; }
+  return seen.size;
+}
+function parseExport(root){
+  const found = []; let col = null;
+  const visit = node => {
+    if (Array.isArray(node)){ node.forEach(visit); return; }
+    if (!node || typeof node !== "object") return;
+    const smd = node.string_map_data;
+    if (node.title === "Collection" && smd && smd.Name && smd.Name.value && !smd.Name.href){ col = String(smd.Name.value); return; }
+    if (Array.isArray(node.label_values)){
+      const r = fromLabelValues(node);
+      if (r){
+        const m = r.url.match(POST_RE), kind = m[1] === "p" ? "p" : "reel";
+        let ts = typeof node.timestamp === "number" ? node.timestamp : 0; if (ts > 1e12) ts = Math.floor(ts / 1000);
+        const cap = r.cap ? r.cap.slice(0, 600) : null;
+        let h = r.h.length ? r.h : (cap ? (cap.match(/#[\p{L}\p{N}_]+/gu) || []).map(x => x.slice(1)) : []);
+        found.push({ k: m[2], u: "https://www.instagram.com/" + kind + "/" + m[2] + "/", o: (r.owner || "unknown").replace(/^@/, ""), on: r.on ? r.on.slice(0, 80) : null,
+          t: m[1] === "p" ? "post" : "reel", s: ts, cap, h: [...new Set(h)].slice(0, 30), tr: null, pd: null, rank: null, x: col });
+        return;
+      }
+    }
+    const info = entryInfo(node);
+    const holdsList = Object.entries(node).some(([k, v]) => k !== "media" && Array.isArray(v) && v.some(x => x && typeof x === "object"));
+    if (info.count === 1 && !holdsList && deepCount(node) === 1){
+      const m = info.url.match(POST_RE), kind = m[1] === "p" ? "p" : "reel";
+      let owner = (typeof node.title === "string" && node.title.trim() && node.title !== "Collection") ? node.title.trim() : (info.owner || "");
+      if (!owner){ const om = info.url.match(/instagram\.com\/([A-Za-z0-9._]+)\/(?:p|reel|reels|tv)\//); owner = om ? om[1] : "unknown"; }
+      let ts = info.ts; if (ts && ts > 1e12) ts = Math.floor(ts / 1000);
+      if (!ts && typeof node.saved === "string") ts = Math.floor(Date.parse(node.saved) / 1000) || 0;
+      const cap = info.cap ? info.cap.slice(0, 600) : null;
+      let h = Array.isArray(node.hashtags) ? node.hashtags.map(x => String(x).replace(/^#/, "")) : [];
+      if (!h.length && cap) h = (cap.match(/#[\p{L}\p{N}_]+/gu) || []).map(x => x.slice(1));
+      const pd = typeof node.posted_at === "string" ? Math.floor(Date.parse(node.posted_at) / 1000) || null : null;
+      found.push({ k: m[2], u: "https://www.instagram.com/" + kind + "/" + m[2] + "/", o: owner.replace(/^@/, ""),
+        t: (m[1] === "p" && node.type !== "reel") ? "post" : "reel", s: ts || 0, cap, h: [...new Set(h)].slice(0, 30),
+        tr: typeof node.transcript === "string" && node.transcript.trim() ? node.transcript.trim().slice(0, 800) : null,
+        pd, rank: Number.isInteger(node.rank) ? node.rank : null, x: col, on: typeof node.creatorName === "string" ? node.creatorName.slice(0, 80) : null });
+      return;
+    }
+    for (const v of Object.values(node)) if (v && typeof v === "object") visit(v);
+  };
+  visit(root);
+  return found;
+}
+function savesortAssignments(json, out){
+  if (!json || !Array.isArray(json.categories)) return;
+  const add = (p, cat) => { const m = String((p && p.url) || "").match(POST_RE); if (m) out.push({ k: m[2], cat, note: p.note, locked: !!p.locked, conf: p.aiConfidence }); };
+  for (const c of json.categories) for (const p of (c && c.posts) || []) add(p, String(c.name || ""));
+  for (const p of json.uncategorized || []) add(p, null);
+}
+const IMG_RE = /(?:^|\/)([A-Za-z0-9_-]{5,})\.(jpe?g|png|webp)$/i;
+const IMG_TYPE = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+async function parseFiles(files){
+  const found = [], problems = [], assign = [], thumbs = []; let libFile = null;
+  for (const f of files){
+    try {
+      if (/\.zip$/i.test(f.name) || /zip/.test(f.type)){
+        if (!window.JSZip){ problems.push(f.name + ": zip support didn't load. Unzip it and pick saved_posts.json."); continue; }
+        const zip = await JSZip.loadAsync(f);
+        const entries = Object.values(zip.files).filter(e => !e.dir && /saved[^/]*\.json$/i.test(e.name));
+        const imgs = Object.values(zip.files).filter(e => !e.dir && IMG_RE.test(e.name) && !/(^|\/)__MACOSX\//.test(e.name));
+        for (const e of imgs){ const m = e.name.match(IMG_RE); thumbs.push({ k: m[1], type: IMG_TYPE[m[2].toLowerCase()], get: () => e.async("blob") }); }
+        if (!entries.length && !imgs.length){ problems.push(f.name + ": no saved-posts file or thumbnails inside. When exporting, include Saved and choose JSON."); continue; }
+        for (const e of entries){ try { const j = JSON.parse(await e.async("string")); savesortAssignments(j, assign); found.push(...parseExport(j)); } catch {} }
+      } else if (/^image\//.test(f.type) || IMG_RE.test(f.name)){
+        const m = f.name.match(IMG_RE);
+        if (m) thumbs.push({ k: m[1], type: IMG_TYPE[m[2].toLowerCase()], get: async () => f }); else problems.push(f.name + ": image names must be the post code, like DdjJ-1ZgI9P.jpg.");
+      } else {
+        const txt = await f.text(); let json;
+        const lib = /\.html?$/i.test(f.name) || /^\s*</.test(txt) ? libraryFromHtml(txt) : null;
+        if (lib){ libFile = lib; continue; }
+        try { json = JSON.parse(txt); } catch { problems.push(f.name + (/<html/i.test(txt) ? ": this is the HTML export. Request it again with Format set to JSON." : ": this file isn't JSON.")); continue; }
+        savesortAssignments(json, assign);
+        const got = parseExport(json);
+        if (!got.length) problems.push(f.name + ": no saved posts found in it.");
+        found.push(...got);
+      }
+    } catch { problems.push(f.name + ": couldn't be read."); }
+  }
+  return { found, problems, assign, thumbs, libFile };
+}
+async function uploadThumbs(thumbs){
+  if (!thumbs.length) return "";
+  if (OWNKEY) return " Previews in the app come from Instagram directly, so thumbnail files aren't needed here.";
+  if (!assetsNS) return " Thumbnails can't be stored in this view.";
+  const byK = new Map(state.posts.map(p => [p.k, p]));
+  const todo = thumbs.filter(t => byK.has(t.k) && !byK.get(t.k).th);
+  let done = 0, stop = "";
+  for (const t of todo){
+    let tries = 0;
+    for (;;){
+      try {
+        const r = await assetsNS.upload(await t.get(), { type: t.type });
+        const p = byK.get(t.k); p.th = r.id; markPost(p); done++; break;
+      } catch (e) {
+        const code = e && e.code;
+        if ((code === "rate_limited" || code === "store_unavailable") && tries++ < 3){ await sleep(3000); continue; }
+        if (code === "quota_or_state") stop = " Storage for thumbnails is full, so the rest were skipped.";
+        else if (code === "too_large") break;
+        else stop = " Thumbnail upload stopped (" + (code || "error") + ").";
+        break;
+      }
+    }
+    if (stop) break;
+    if (done % 10 === 0) toast("Adding previews… " + done + " of " + todo.length);
+  }
+  return " Added " + plural(done, "preview") + (thumbs.length - todo.length ? " (" + (thumbs.length - todo.length) + " already had one or aren't in this library)" : "") + "." + stop;
+}
+function mergeFound(found, cutoff){
+  const byK = new Map(state.posts.map(p => [p.k, p])), t0 = nowS();
+  let added = 0, enriched = 0, skipped = 0;
+  for (const f of found){
+    const ex = byK.get(f.k);
+    if (ex){
+      let ch = false;
+      for (const k of ["x", "cap", "tr", "pd", "on"]) if (f[k] && !ex[k]){ ex[k] = f[k]; ch = true; }
+      if (f.h.length && !(ex.h && ex.h.length)){ ex.h = f.h; ch = true; }
+      if ((!ex.o || ex.o === "unknown") && f.o !== "unknown"){ ex.o = f.o; ch = true; }
+      if (ex.est && f.s){ ex.s = f.s; delete ex.est; ch = true; }
+      if (ch && ex.ai && !ex.l) Object.assign(ex, { c: null, ai: false, f: null });
+      if (ch) enriched++;
+      continue;
+    }
+    if (cutoff && f.s && f.s <= cutoff){ skipped++; continue; }
+    const p = { k: f.k, u: f.u, o: f.o, t: f.t, s: f.s || (t0 - (f.rank ?? 0)), c: null, f: null, l: false, ai: false, n: "" };
+    if (!f.s) p.est = 1;
+    for (const k of ["cap", "tr", "pd", "x", "on"]) if (f[k]) p[k] = f[k];
+    if (f.h.length) p.h = f.h;
+    state.posts.push(p); byK.set(f.k, p); added++;
+  }
+  state.posts.sort((a, b) => (b.s || 0) - (a.s || 0));
+  const counts = countBy(); state.cats = state.cats.filter(c => c.src === "user" || counts.get(c.id));
+  return { added, enriched, skipped };
+}
+async function importFiles(files){
+  const { found, problems, assign, thumbs, libFile } = await parseFiles(files);
+  if (libFile){
+    if (state.posts.length && !await ask({ title: "Open this library file?", text: "It has " + plural(libFile.posts.length, "save") + (libFile.savedAt ? ", saved " + fmtDate(libFile.savedAt) : "") + ". It replaces what's on screen now.", ok: "Open it" })) return;
+    await openLibrary(libFile); return;
+  }
+  if (!found.length && thumbs.length && state.lib){
+    const t = await uploadThumbs(thumbs); markAll();
+    toast((t.trim() + " " + problems.join(" ")).trim()); render(); return;
+  }
+  if (!found.length){ toast(problems.join(" ") || "No saved posts found in those files.", true); render(); return; }
+
+  let mode = "append", cutoff = 0;
+  if (state.lib && state.posts.length){
+    cutoff = newestSaved();
+    const have = new Set(state.posts.map(p => p.k));
+    const fresh = found.filter(f => !have.has(f.k) && !(cutoff && f.s && f.s <= cutoff)).length;
+    const since = cutoff ? fmtDate(cutoff) : "";
+    const choice = await dialog({ title: "New saves file",
+      text: (fresh ? plural(fresh, "new save") + (since ? " from " + since + " to today" : "") : "No new saves" + (since ? " since " + since : "")) +
+        ". Add them and sort only those, or clear everything and sort this file from scratch?",
+      buttons: [{ v: "__cancel", label: "Cancel" }, { v: "replace", label: "Clear and start over", cls: "danger" }, { v: "append", label: "Add new and sort", cls: "primary" }] });
+    if (!choice) return;
+    if (choice === "replace"){
+      if (!await ask({ title: "Clear everything?", text: "This removes your " + plural(state.posts.length, "save") + ", " + plural(state.cats.length, "category", "categories") + " and notes from Reelcall, then sorts the new file from scratch. Save to phone first if you want a copy.", ok: "Clear and start over", danger: true })) return;
+      state.posts = []; state.cats = []; state.colImported = false; state.imports = []; state.settings.userCats = []; cutoff = 0;
+    }
+    mode = choice;
+  }
+  if (!state.lib) await createLib("My saves");
+  const before = new Set(state.posts.map(p => p.k));
+  const r = mergeFound(found, mode === "append" ? cutoff : 0);
+  if (assign.length){
+    const byK = new Map(state.posts.map(p => [p.k, p]));
+    for (const a of assign){
+      const p = byK.get(a.k); if (!p) continue;
+      if (a.note && !p.n) p.n = String(a.note).slice(0, 200);
+      if (p.l || p.c) continue;
+      const c = a.cat ? ensureCat(a.cat, a.locked ? "user" : "ai") : null;
+      if (c) Object.assign(p, { c: c.id, l: a.locked, ai: !a.locked, f: typeof a.conf === "number" ? a.conf : null });
+    }
+  }
+  state.imports.push({ at: nowS(), added: r.added, newest: newestSaved() });
+  markAll(); await saveLibs();
+  state.filter = "all"; state.shown = 150; state.view = "cats";
+  render();
+  const added = state.posts.filter(p => !before.has(p.k) && !p.c);
+  const parts = [r.added ? "Added " + plural(r.added, "new save") + (mode === "append" && cutoff ? " from " + fmtDate(cutoff) + " to today." : ".") : "No new saves in these files."];
+  if (r.enriched) parts.push("Updated details on " + plural(r.enriched, "post") + ".");
+  if (r.skipped) parts.push("Skipped " + plural(r.skipped, "older save") + " you already had.");
+  toast(parts.concat(problems).join(" "));
+  if (thumbs.length){ const t = await uploadThumbs(thumbs); markAll(); toast(t.trim()); render(); }
+  if (added.length) sortNew(added, mode === "replace");
+}
+// Sort only the given posts: into your existing categories first, AI makes new ones for what doesn't fit.
+async function sortNew(posts, fromScratch){
+  const sample = await getSample();
+  if (!sample || (OWNKEY && !aiCfg().key)){ toast("Add your AI key to sort these automatically (⋯ → AI key)."); return; }
+  const names = state.cats.map(c => c.name);
+  const limit = fromScratch && state.settings.limit ? state.settings.limit : 0;
+  const targets = limit ? posts.slice().sort((a, b) => (b.s || 0) - (a.s || 0)).slice(0, limit) : posts;
+  toast("Sorting " + plural(targets.length, "save") + "…");
+  await runSort({ targets, mode: names.length ? "mixed" : (fromScratch ? state.settings.mode : "auto"), names });
+}
+
+/* ---------- AI ---------- */
+let samplePromise = null;
+const getSample = () => samplePromise || (samplePromise = OWNKEY ? Promise.resolve(apiSample) : (window.claude && typeof window.claude.use === "function" ? window.claude.use("sample") : Promise.resolve(null)).catch(() => null));
+const rich = p => !!((p.n && p.n.trim()) || p.cap || p.tr || (p.h && p.h.length));
+function buildItems(posts){
+  const groups = new Map(), items = [];
+  for (const p of posts){
+    if (rich(p) || !p.o || p.o === "unknown"){ items.push({ posts: [p], o: p.o, on: p.on, x: p.x }); continue; }
+    const k = p.o + "|" + (p.x || "");
+    let g = groups.get(k);
+    if (!g){ g = { posts: [], o: p.o, on: p.on, x: p.x }; groups.set(k, g); items.push(g); }
+    g.posts.push(p);
+  }
+  return items;
+}
+function describe(it, i){
+  const ps = it.posts, reels = ps.filter(p => p.t === "reel").length, photos = ps.length - reels;
+  let s = i + " | @" + it.o + (it.on ? " (" + it.on + ")" : "") + " | " + [reels ? plural(reels, "reel") : "", photos ? plural(photos, "photo post") : ""].filter(Boolean).join(" and ");
+  if (it.x) s += ' | in their Instagram collection "' + it.x + '"';
+  if (ps.length === 1){
+    const p = ps[0], one = t => t.replace(/\s+/g, " ").trim();
+    if (p.cap) s += ' | caption: "' + one(p.cap.replace(/#[\p{L}\p{N}_]+/gu, "")).slice(0, 240) + '"';
+    if (p.h && p.h.length) s += " | hashtags: " + p.h.slice(0, 12).map(h => "#" + h).join(" ");
+    if (p.tr) s += ' | spoken in video: "' + one(p.tr).slice(0, 300) + '"';
+    if (p.n && p.n.trim()) s += ' | user note: "' + one(p.n).slice(0, 200) + '"';
+  }
+  return s;
+}
+function toBatches(items){
+  const out = []; let cur = [], size = 0;
+  for (const it of items){ const l = describe(it, 0).length; if (cur.length && (cur.length >= 50 || size + l > 30000)){ out.push(cur); cur = []; size = 0; } cur.push(it); size += l; }
+  if (cur.length) out.push(cur);
+  return out;
+}
+const classifyPrompt = (lines, names) =>
+"You are sorting someone's saved Instagram posts into categories.\n" +
+"Each item shows the creator's handle and the kind of post, and often more: the caption, hashtags, words spoken in the video, a note from the user, or an Instagram collection they already filed it in. Base your choice on the content evidence first (caption, hashtags, spoken words, notes, collection). When an item has only a handle, use what the handle reveals about the creator's niche.\n\n" +
+"Categories (use these exact names):\n" + names.map(n => "- " + n).join("\n") + "\n\n" +
+"For every item choose the single best category and a confidence from 0 to 1. If there is no real clue about the content, give a confidence below 0.3. If no category fits, use \"Uncategorized\" with confidence 0.\n\n" +
+"Reply with only a JSON array with one object per item, like [{\"i\":0,\"c\":\"" + names[0].replace(/"/g, "") + "\",\"p\":0.8}].\n\nItems:\n" + lines.join("\n");
+const proposePrompt = (lines, keep, avoid) =>
+"Below are items from someone's saved Instagram posts: the creator's handle and kind of post, often with the caption, hashtags, spoken words, a user note or an Instagram collection name.\n\n" +
+"Propose categories to organize these saves the way a person would name folders: short (1 to 3 words), Title Case, specific enough to be useful (\"Home Workouts\" rather than \"Lifestyle\"), broad enough that each holds several items. Propose between 3 and 12. Don't create a catch-all like \"Other\" or \"Misc\".\n" +
+(keep.length ? "They already use these categories; include any that fit: " + keep.join(", ") + ".\n" : "") +
+(avoid.length ? "Do not propose these or near-duplicates, they are handled separately: " + avoid.join(", ") + ".\n" : "") +
+"\nReply with only JSON in the form {\"categories\":[\"Name\",\"Name\"]}.\n\nItems:\n" + lines.join("\n");
+function looseJson(t){
+  t = String(t || "").trim();
+  try { return JSON.parse(t); } catch {}
+  const f = t.match(/```(?:json)?\s*([\s\S]*?)```/); if (f){ try { return JSON.parse(f[1]); } catch {} }
+  const a = Math.min(...["[", "{"].map(c => { const i = t.indexOf(c); return i < 0 ? Infinity : i; })), b = Math.max(t.lastIndexOf("]"), t.lastIndexOf("}"));
+  if (a < b){ try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
+  throw { code: "invalid_json", message: "Unreadable reply" };
+}
+async function ask4json(sample, prompt, tier, signal){
+  signal = signal || (run.ctl && run.ctl.signal);
+  for (let attempt = 0; ; attempt++){
+    try {
+      const r = await sample(prompt, Object.assign({ modelTier: tier, cache: false }, signal ? { signal } : {}));
+      return looseJson(r && typeof r === "object" ? r.text : r);
+    } catch (e) {
+      const code = e && e.code;
+      const transient = code === "invalid_json" || code === "upstream_error" || code === "empty_completion" || code === "network";
+      if (transient && attempt < (OWNKEY ? 4 : 1)){
+        if (OWNKEY && attempt) progress(aiName() + " is busy, trying again…", run.frac);
+        await sleep([1500, 4000, 9000, 15000][attempt]); continue;
+      }
+      if (OWNKEY && code === "rate_limited" && attempt < 3){ progress("Free-tier limit reached, waiting 30 seconds…", run.frac); await sleep(30000); continue; }
+      throw e;
+    }
+  }
+}
+const aiName = () => OWNKEY ? (PROVIDERS[aiCfg().provider] || { name: "the AI service" }).name : "Claude";
+function errText(e){
+  const why = e && e.message ? " (" + String(e.message).slice(0, 140) + ")" : "";
+  if (e && e.code === "bad_key") return aiName() + " rejected the request" + why + ". Check your key in ⋯ → AI key.";
+  if (e && e.code === "network") return "Couldn't reach " + aiName() + ". Check your internet connection and run it again; posts sorted so far are kept.";
+  if (e && e.code === "upstream_error") return aiName() + " had a problem" + why + ". Run it again; posts sorted so far are kept.";
+  if (e && ERR[e.code]) return ERR[e.code].replace(/Claude/g, aiName());
+  const detail = (e && (e.code || e.name)) ? String(e.code || e.name) + (e.message ? ": " + e.message : "") : String((e && e.message) || e);
+  return "Something went wrong (" + detail.slice(0, 160) + "). Posts sorted so far are kept.";
+}
+function progress(label, frac){ run.label = label; run.frac = frac; updateRunArea(); }
+async function proposeCats(sample, items, keep, avoid){
+  const lines = []; let size = 0;
+  for (let i = 0; i < items.length; i++){ const l = describe(items[i], i); if ((size += l.length) > 70000) break; lines.push(l); }
+  const res = await ask4json(sample, proposePrompt(lines, keep, avoid), "default");
+  const arr = Array.isArray(res) ? res : (res && Array.isArray(res.categories) ? res.categories : []);
+  const av = avoid.map(a => a.toLowerCase()), out = [];
+  for (const n of arr){ const s = String(n || "").trim().slice(0, 40); if (s && s.toLowerCase() !== "uncategorized" && !av.includes(s.toLowerCase()) && !out.some(o => o.toLowerCase() === s.toLowerCase())) out.push(s); }
+  return out.slice(0, 12);
+}
+async function classifyAll(sample, items, names, label, th){
+  const left = [], bs = toBatches(items), lower = new Map(names.map(n => [n.toLowerCase(), n]));
+  for (let b = 0; b < bs.length; b++){
+    progress(label + (bs.length > 1 ? " (" + (b + 1) + " of " + bs.length + ")" : ""), b / bs.length);
+    const batch = bs[b];
+    const res = await ask4json(sample, classifyPrompt(batch.map((it, i) => describe(it, i)), names), "quick");
+    const arr = Array.isArray(res) ? res : (res && Array.isArray(res.items) ? res.items : []), got = new Map();
+    for (const r of arr){ const i = Number(r && r.i); if (Number.isInteger(i) && i >= 0 && i < batch.length) got.set(i, r); }
+    batch.forEach((it, i) => {
+      const r = got.get(i), name = r ? lower.get(String(r.c || "").trim().toLowerCase()) : null, conf = r ? Math.max(0, Math.min(1, Number(r.p) || 0)) : 0;
+      if (name && conf >= th){ const cat = ensureCat(name, "ai"); for (const p of it.posts){ p.c = cat.id; p.f = conf; p.ai = true; } }
+      else { for (const p of it.posts) p.f = conf; left.push(it); }
+    });
+    markAll(); render();
+  }
+  return left;
+}
+const ERR = {
+  not_granted: "AI sorting needs permission to use Claude. Reload the page and allow it when asked.",
+  sampling_disabled: "Claude isn't available to this page for your account.",
+  rate_limited: "You've hit a usage limit for now. Wait a bit and run it again; posts sorted so far are kept.",
+  invalid_json: "Claude's answer couldn't be read. Run it again; posts sorted so far are kept.",
+  empty_completion: "Claude returned nothing. Run it again; posts sorted so far are kept.",
+  upstream_error: "The connection to Claude dropped. Run it again; posts sorted so far are kept.",
+  session_expired: "Your Claude session expired. Sign in again, then rerun.",
+  refused: "Claude declined this batch. Adjust notes or categories, then rerun.",
+  cancelled: "Stopped. Posts sorted so far are kept.",
+  no_key: "Add your AI key first.",
+  bad_key: null,
+  network: null
+};
+function aiTargets(){
+  const S = state.settings;
+  const pool = S.limit ? state.posts.slice().sort((a, b) => (b.s || 0) - (a.s || 0)).slice(0, S.limit) : state.posts;
+  return pool.filter(p => !p.l && (S.scope === "all" || !p.c));
+}
+async function runSort(opts = {}){
+  const sample = await getSample();
+  if (!sample || run.active) return;
+  if (OWNKEY && !aiCfg().key){ run.msg = "Add your AI key first."; run.err = true; updateRunArea(); return; }
+  const th = state.settings.threshold;
+  let mode = opts.mode || state.settings.mode, userNames = (opts.names || state.settings.userCats).slice();
+  if (mode !== "auto" && !userNames.length){ if (opts.targets) mode = "auto"; else { run.msg = "Add at least one category first."; run.err = true; updateRunArea(); return; } }
+  const targets = opts.targets ? opts.targets.filter(p => !p.l) : aiTargets();
+  if (!targets.length){ run.msg = "Nothing to sort with these settings. Try \"Re-sort\" or a larger range."; run.err = true; updateRunArea(); return; }
+  const before = new Set(state.cats.map(c => c.id));
+  Object.assign(run, { active: true, ctl: new AbortController(), msg: null, err: false });
+  renderAiBody(); render();
+  let pending = buildItems(targets);
+  try {
+    if (mode !== "auto"){ userNames.forEach(n => ensureCat(n, "user")); pending = await classifyAll(sample, pending, userNames, "Sorting into your categories", th); }
+    if (mode !== "strict" && pending.length){
+      progress("Working out categories from your saves…", null);
+      const keep = mode === "auto" ? state.cats.map(c => c.name) : [], avoid = mode === "mixed" ? userNames : [];
+      const proposed = await proposeCats(sample, pending, keep, avoid);
+      const names = mode === "auto" ? [...new Set([...proposed, ...keep])] : proposed;
+      if (names.length) pending = await classifyAll(sample, pending, names, mode === "mixed" ? "Sorting the rest into new categories" : "Sorting into categories", th);
+    }
+    for (const it of pending) for (const p of it.posts){ p.c = null; p.ai = false; }
+    const moved = targets.filter(p => p.c).length;
+    run.msg = "Sorted " + plural(moved, "post") + ". " + (targets.length - moved ? plural(targets.length - moved, "post") + " stayed in Uncategorized because the AI wasn't sure enough." : "Nothing left uncategorized.");
+  } catch (e) {
+    run.msg = errText(e); try { console.error("Reelcall AI error", e); } catch {}
+    run.err = !(e && e.code === "cancelled");
+  } finally {
+    const counts = countBy();
+    state.cats = state.cats.filter(c => before.has(c.id) || c.src === "user" || (counts.get(c.id) || 0) > 0);
+    Object.assign(run, { active: false, ctl: null });
+    markAll(); render(); renderAiBody();
+    if (sheetKind !== "ai" && run.msg) toast(run.msg, run.err);
+  }
+}
+
+/* ---------- library file on the phone ---------- */
+function libraryPayload(withKey){
+  return { v: 3, savedAt: nowS(), name: state.lib ? state.lib.name : "My saves",
+    meta: { cats: state.cats, settings: state.settings, colImported: state.colImported, imports: state.imports },
+    posts: state.posts, ai: withKey && aiCfg().key ? aiCfg() : undefined };
+}
+function downloadFile(name, text, type){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+async function saveLibraryFile(withKey){
+  await flushNow();
+  const json = JSON.stringify(clean(libraryPayload(withKey))).replace(/</g, "\\u003c");
+  const block = MARK_A + '<script type="application/json">' + json + "</scr" + "ipt>" + MARK_B;
+  const html = PRISTINE.replace(MARK_RE, "").replace("<he" + "ad>", "<he" + "ad>" + block);
+  downloadFile("reelcall-library.html", html, "text/html");
+  state.fileDirty = false; dirty.meta = true; schedule(); render();
+  toast("Saved reelcall-library.html to Downloads. Open it anytime to see your categories.");
+}
+async function openLibrary(lib, quiet){
+  if (!lib || !Array.isArray(lib.posts)) return false;
+  if (!state.lib) await createLib(lib.name || "My saves");
+  const m = lib.meta || {};
+  state.posts = clean(lib.posts); state.cats = clean(m.cats || []); state.settings = Object.assign(defaults(), m.settings || {});
+  state.colImported = !!m.colImported; state.imports = clean(m.imports || []);
+  if (lib.ai && lib.ai.key && !aiCfg().key){ setAiCfg(lib.ai); samplePromise = null; aiAvailable = true; }
+  state.fileDirty = false; dirty.all = true; dirty.meta = true; await flush();
+  state.view = "cats"; state.filter = "all"; render();
+  if (!quiet) toast("Opened your library: " + plural(state.posts.length, "save") + " in " + plural(state.cats.length, "category", "categories"));
+  return true;
+}
+function openSaveSheet(){
+  openSheet("save",
+    '<div class="sheethead"><div><h3>Save to phone</h3><div class="sub">Downloads <b>reelcall-library.html</b>: the app with all your saves, categories and notes inside. Open it from Downloads anytime, even if Chrome\'s storage gets cleared.</div></div><button class="iconbtn" data-act="close" aria-label="Close">' + ICON.close + '</button></div>' +
+    '<div class="field radios"><label><input type="checkbox" id="withKey"> Include my AI key, so I don\'t have to paste it again (don\'t share this file then)</label></div>' +
+    '<p class="sub">Each save creates a new file. Open the newest one, and delete older copies whenever you like.</p>' +
+    '<div class="actions"><button class="btn primary" data-act="dosave">Save file</button></div>',
+    s => { s.onclick = e => { const a = e.target.closest("[data-act]"); if (!a) return;
+      if (a.dataset.act === "close") closeSheet();
+      if (a.dataset.act === "dosave"){ const k = $("#withKey", s).checked; closeSheet(); saveLibraryFile(k); } }; });
+}
+
+/* ---------- actions ---------- */
+function movePost(p, catId){ Object.assign(p, { c: catId || null, l: true, ai: false, f: null }); markPost(p); }
+function useInstagramCollections(){
+  for (const p of state.posts) if (p.x && !p.l && !p.c){ const c = ensureCat(p.x, "user"); if (c){ p.c = c.id; p.l = true; } }
+  state.colImported = true;
+  for (const c of state.cats) if (c.src === "user" && !state.settings.userCats.includes(c.name)) state.settings.userCats.push(c.name);
+  markAll(); render();
+}
+async function newCategory(){
+  const name = await ask({ title: "New category", input: "", placeholder: "e.g. Recipes", ok: "Create category" });
+  if (!name || name.toLowerCase() === "uncategorized") return null;
+  const c = ensureCat(name, "user"); if (!c) return null;
+  c.src = "user"; if (!state.settings.userCats.includes(c.name)) state.settings.userCats.push(c.name);
+  markMeta(); render(); return c;
+}
+async function renameCategory(c){
+  const name = await ask({ title: "Rename category", input: c.name, ok: "Rename" });
+  if (!name || name.toLowerCase() === "uncategorized") return;
+  const old = c.name; c.name = name.slice(0, 40); c.src = "user";
+  state.settings.userCats = state.settings.userCats.map(n => n === old ? c.name : n);
+  if (!state.settings.userCats.includes(c.name)) state.settings.userCats.push(c.name);
+  markMeta(); render();
+}
+async function deleteCategory(c){
+  const n = state.posts.filter(p => p.c === c.id).length;
+  if (!await ask({ title: "Delete \"" + c.name + "\"?", text: n ? "Its " + plural(n, "post") + " move to Uncategorized." : "It has no posts.", ok: "Delete category", danger: true })) return;
+  for (const p of state.posts) if (p.c === c.id) Object.assign(p, { c: null, l: false, ai: false });
+  state.cats = state.cats.filter(x => x !== c); state.settings.userCats = state.settings.userCats.filter(x => x !== c.name);
+  state.filter = "all"; markAll(); render();
+}
+async function clearCategories(){
+  if (!await ask({ title: "Clear all categories?", text: "Every category is deleted and all " + plural(state.posts.length, "post") + " go back to Uncategorized, including ones you placed yourself. Posts and notes stay.", ok: "Clear categories", danger: true })) return;
+  for (const p of state.posts) Object.assign(p, { c: null, l: false, ai: false, f: null });
+  state.cats = []; state.colImported = false; state.filter = "all"; markAll(); render();
+}
+async function deletePosts(keys){
+  const n = keys.size;
+  if (!await ask({ title: "Remove " + plural(n, "post") + "?", text: "They're removed from this app only. Your Instagram saves aren't touched.", ok: "Remove", danger: true })) return false;
+  const gone = state.posts.filter(p => keys.has(p.k) && p.th).map(p => p.th);
+  state.posts = state.posts.filter(p => !keys.has(p.k)); markAll(); dropAssets(gone); return true;
+}
+async function dropAssets(ids){ if (!assetsNS) return; for (const id of ids){ try { await assetsNS.delete(id); } catch {} } }
+async function renameLib(){
+  const name = await ask({ title: "Rename library", input: state.lib.name, ok: "Rename" });
+  if (!name) return; state.lib.name = name.slice(0, 60); await saveLibs(); render();
+}
+async function deleteLib(){
+  if (!await ask({ title: "Delete \"" + state.lib.name + "\"?", text: "Deletes its " + plural(state.posts.length, "post") + ", categories and notes from this app. Your Instagram account isn't touched.", ok: "Delete library", danger: true })) return;
+  await flushNow();
+  const id = state.lib.id; dropAssets(state.posts.filter(p => p.th).map(p => p.th));
+  try { const m = await store.get(key(id, "meta")); const n = Math.max(savedChunkCount, (m && m.chunkCount) || 0);
+    for (let i = 0; i < n; i++) await store.del(key(id, "c_" + i)); await store.del(key(id, "meta")); } catch { setSync("error"); }
+  state.libs = state.libs.filter(l => l.id !== id);
+  if (state.libs.length) await loadLib(state.libs[0]); else { state.lib = null; resetLibState(); }
+  await saveLibs(); render();
+}
+async function exportJson(){
+  if (!downloadsNS && !OWNKEY) return;
+  const pick = p => ({ url: p.u, creator: p.o, creatorName: p.on || undefined, type: p.t, saved: p.est ? null : new Date(p.s * 1000).toISOString(), caption: p.cap || undefined, hashtags: p.h, note: p.n || undefined, locked: p.l || undefined, aiConfidence: p.ai ? p.f : undefined });
+  const data = { library: state.lib.name, exported: new Date().toISOString(),
+    categories: state.cats.map(c => ({ name: c.name, posts: state.posts.filter(p => p.c === c.id).map(pick) })),
+    uncategorized: state.posts.filter(p => !p.c).map(pick) };
+  const text = JSON.stringify(data, null, 2);
+  if (downloadsNS){ try { await downloadsNS.save({ filename: "instagram-saves-sorted.json", data: text }); } catch {} return; }
+  if (NATIVE){
+    const P = window.Capacitor.Plugins || {};
+    try { const w = await P.Filesystem.writeFile({ path: "reelcall-backup.json", data: text, directory: "CACHE", encoding: "utf8" }); await P.Share.share({ title: "Reelcall backup", url: w.uri }); }
+    catch (e) { if (!/cancel/i.test(String(e && e.message))) toast("Couldn't share the backup file.", true); }
+    return;
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "application/json" })); a.download = "instagram-saves-sorted.json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ---------- dialog ---------- */
+function dialog({ title, text, input, placeholder, buttons }){
+  return new Promise(resolve => {
+    const d = $("#dialog"), box = $("#dialogbox");
+    box.innerHTML = '<h4>' + esc(title) + '</h4>' + (text ? '<p>' + esc(text) + '</p>' : '') +
+      (input !== undefined ? '<input class="input" id="dlgIn" maxlength="60" value="' + esc(input) + '" placeholder="' + esc(placeholder || "") + '">' : '') +
+      '<div class="actions">' + buttons.map(b => '<button class="btn ' + (b.cls || "") + '" data-x="' + b.v + '">' + esc(b.label) + '</button>').join("") + '</div>';
+    d.hidden = false;
+    const inp = $("#dlgIn");
+    (inp || box.querySelector(".actions button:last-child")).focus(); inp && inp.select();
+    const done = v => { d.hidden = true; box.onclick = null; document.removeEventListener("keydown", keyh, true); resolve(v); };
+    const pick = v => v === "__cancel" ? done(null) : done(inp ? inp.value.trim() : v);
+    const keyh = e => { if (e.key === "Escape"){ e.stopPropagation(); done(null); } else if (e.key === "Enter" && inp){ e.preventDefault(); pick("ok"); } };
+    document.addEventListener("keydown", keyh, true);
+    box.onclick = e => { const x = e.target.closest("[data-x]"); if (x) pick(x.dataset.x); };
+  });
+}
+const ask = ({ title, text, input, placeholder, ok, danger }) =>
+  dialog({ title, text, input, placeholder, buttons: [{ v: "__cancel", label: "Cancel" }, { v: "ok", label: ok, cls: danger ? "danger" : "primary" }] })
+    .then(v => input !== undefined ? v : v === "ok");
+
+/* ---------- sheets ---------- */
+let sheetKind = null;
+function openSheet(kind, html, mount){
+  sheetKind = kind; const layer = $("#layer"), s = $("#sheet");
+  s.innerHTML = html; layer.hidden = false; requestAnimationFrame(() => layer.classList.add("on"));
+  mount && mount(s);
+  const f = s.querySelector("button, a, select, input"); f && f.focus({ preventScroll: true });
+}
+function closeSheet(){ const layer = $("#layer"); layer.classList.remove("on"); sheetKind = null; setTimeout(() => { if (!sheetKind) layer.hidden = true; }, 200); }
+$("#layer").addEventListener("click", e => { if (e.target.id === "layer") closeSheet(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && sheetKind && $("#dialog").hidden) closeSheet(); });
+const catOptions = sel => '<option value="">Uncategorized</option>' + state.cats.map(c => '<option value="' + c.id + '"' + (c.id === sel ? " selected" : "") + '>' + esc(c.name) + '</option>').join("") + '<option value="__new">New category…</option>';
+const dateLine = p => p.est ? (p.pd ? "posted " + fmtDate(p.pd) : "") : (p.s ? "saved " + fmtDate(p.s) : "");
+
+function openDetail(k){
+  const p = state.posts.find(x => x.k === k); if (!p) return;
+  const statusHtml = () => {
+    if (p.l) return '<div class="status"><span>Placed by you</span><button class="link" data-act="unlock">Let AI decide</button></div>';
+    if (p.c && p.ai) return '<div class="status"><span>Placed by AI, ' + Math.round((p.f || 0) * 100) + '% sure</span></div>';
+    if (!p.c && p.f != null) return '<div class="status"><span>AI wasn\'t sure about this one</span></div>';
+    return '';
+  };
+  const dl = dateLine(p);
+  openSheet("detail",
+    '<div class="sheethead"><span class="av" style="--h:' + hue(p.o) + '">' + esc((p.o || "?")[0]) + '</span><div><h3>@' + esc(p.o) + '</h3><div class="sub">' +
+      esc(p.on || ((p.t === "reel" ? "Reel" : "Post") + (dl ? ", " + dl : ""))) + '</div></div><button class="iconbtn" data-act="close" aria-label="Close">' + ICON.close + '</button></div>' +
+    (OWNKEY ? '<div class="preview"><iframe loading="lazy" scrolling="no" src="https://www.instagram.com/p/' + encodeURIComponent(p.k) + '/embed/"></iframe></div>'
+      : p.th ? '<div class="preview"><img alt="" src="/_blob/' + esc(p.th) + '"></div>' : '') +
+    '<a class="btn primary big watch" href="' + esc(p.u) + '" target="_blank" rel="noopener noreferrer">' + ICON.play + (p.t === "reel" ? "Watch on Instagram" : "Open on Instagram") + '</a>' +
+    '<div class="field"><label for="dCat">Category</label><select class="input" id="dCat">' + catOptions(p.c) + '</select><div id="dStatus">' + statusHtml() + '</div></div>' +
+    (p.cap || p.tr || (p.h && p.h.length) ? '<details class="more-info"><summary>Caption' + (p.tr ? " and transcript" : "") + '</summary>' +
+      (p.cap ? '<p>' + esc(p.cap) + '</p>' : '') + (p.tr ? '<p>' + esc(p.tr) + '</p>' : '') +
+      (p.h && p.h.length ? '<div class="tags">' + p.h.map(h => '<span>#' + esc(h) + '</span>').join("") + '</div>' : '') + '</details>' : '') +
+    '<div class="field"><label for="dNote">Note</label><textarea class="input" id="dNote" maxlength="200" placeholder="Optional: what is this about? Helps the AI.">' + esc(p.n || "") + '</textarea></div>' +
+    '<div class="actions" style="justify-content:space-between"><a class="link" href="https://www.instagram.com/' + encodeURIComponent(p.o) + '/" target="_blank" rel="noopener noreferrer">View profile</a><button class="link danger" data-act="delpost">Remove from app</button></div>',
+    s => {
+      const sel = $("#dCat", s);
+      sel.onchange = async () => {
+        let v = sel.value;
+        if (v === "__new"){ const c = await newCategory(); if (!c){ sel.innerHTML = catOptions(p.c); return; } v = c.id; }
+        movePost(p, v); sel.innerHTML = catOptions(p.c); $("#dStatus", s).innerHTML = statusHtml(); render();
+      };
+      let t; $("#dNote", s).oninput = e => { p.n = e.target.value; clearTimeout(t); t = setTimeout(() => { markPost(p); render(); }, 500); };
+      s.onclick = async e => {
+        const a = e.target.closest("[data-act]"); if (!a) return;
+        if (a.dataset.act === "close") closeSheet();
+        if (a.dataset.act === "unlock"){ p.l = false; markPost(p); $("#dStatus", s).innerHTML = statusHtml(); render(); }
+        if (a.dataset.act === "delpost" && await deletePosts(new Set([p.k]))){ closeSheet(); render(); }
+      };
+    });
+}
+
+function openAi(){ if (OWNKEY && !aiCfg().key) return openKeySheet(openAi); openSheet("ai", '<div id="aiBody"></div>'); renderAiBody(); }
+function renderAiBody(){
+  const host = $("#aiBody"); if (!host || sheetKind !== "ai") return;
+  const S = state.settings, targets = aiTargets(), n = targets.length;
+  const seg = (v, t, d) => '<label><input type="radio" name="mode" value="' + v + '"' + (S.mode === v ? " checked" : "") + '><b>' + t + '</b><span>' + d + '</span></label>';
+  host.innerHTML =
+    '<div class="sheethead"><div><h3>Sort with AI</h3><div class="sub">' + plural(n, "post") + ' will be sorted.</div></div><button class="iconbtn" data-act="close" aria-label="Close">' + ICON.close + '</button></div>' +
+    (OWNKEY ? '<div class="keyline"><span>' + (aiCfg().key ? "AI: " + esc(provName(aiCfg())) : "No AI key yet") + '</span><button class="link" data-act="key">' + (aiCfg().key ? "Change key" : "Add key") + '</button></div>' : '') +
+    '<div class="field"><span class="lbl">Mode</span><div class="seg" role="radiogroup">' +
+      seg("auto", "Auto", "AI invents categories from your saves.") + seg("strict", "Strict", "Only your categories. The rest stay Uncategorized.") + seg("mixed", "Mixed", "Your categories first, AI makes new ones for the rest.") +
+    '</div></div>' +
+    (S.mode !== "auto" ? '<div class="field"><label for="tagIn">Your categories</label><div class="tagbox">' +
+      S.userCats.map((c, i) => '<span class="tag">' + esc(c) + '<button data-rm="' + i + '" aria-label="Remove ' + esc(c) + '">×</button></span>').join("") +
+      '<input id="tagIn" placeholder="Type a category, press Enter" maxlength="40"></div><div class="hint">' +
+      (S.mode === "strict" ? "Posts that don't clearly fit go to Uncategorized." : "Posts that don't fit these get AI-made categories.") + '</div></div>' : '') +
+    '<div class="two"><div class="field"><label for="lim">Which saves</label><select class="input" id="lim">' +
+      [100, 200, 300, 400, 500, 600].map(v => '<option value="' + v + '"' + (S.limit === v ? " selected" : "") + '>Most recent ' + v + '</option>').join("") +
+      '<option value="0"' + (!S.limit ? " selected" : "") + '>All ' + state.posts.length.toLocaleString() + ' saves</option></select></div>' +
+    '<div class="field"><label for="th">AI must be at least <span id="thv">' + Math.round(S.threshold * 100) + '%</span> sure</label><input type="range" id="th" min="0.3" max="0.9" step="0.05" value="' + S.threshold + '"></div></div>' +
+    '<div class="field"><div class="radios">' +
+      '<label><input type="radio" name="scope" value="unsorted"' + (S.scope === "unsorted" ? " checked" : "") + '> Only posts without a category</label>' +
+      '<label><input type="radio" name="scope" value="all"' + (S.scope === "all" ? " checked" : "") + '> Re-sort everything except posts I placed myself</label></div></div>' +
+
+    '<div id="runArea"></div>' +
+    '<div class="actions">' + (run.active ? '<button class="btn" data-act="stop">Stop</button>' : '<button class="btn ai big" data-act="run"' + (n ? "" : " disabled") + '>Sort ' + plural(n, "post") + '</button>') + '</div>';
+  updateRunArea();
+  host.querySelectorAll("input[name=mode]").forEach(r => r.onchange = () => { S.mode = r.value; markMeta(); renderAiBody(); });
+  host.querySelectorAll("input[name=scope]").forEach(r => r.onchange = () => { S.scope = r.value; markMeta(); renderAiBody(); });
+  $("#lim", host).onchange = e => { S.limit = Number(e.target.value); markMeta(); renderAiBody(); };
+  const th = $("#th", host); th.oninput = () => { S.threshold = Number(th.value); $("#thv").textContent = Math.round(S.threshold * 100) + "%"; }; th.onchange = markMeta;
+  const tagIn = $("#tagIn", host);
+  if (tagIn){
+    const add = () => { const v = tagIn.value.trim().replace(/,$/, "").slice(0, 40);
+      if (v && v.toLowerCase() !== "uncategorized" && !S.userCats.some(x => x.toLowerCase() === v.toLowerCase())){ S.userCats.push(v); markMeta(); renderAiBody(); $("#tagIn") && $("#tagIn").focus(); } else tagIn.value = ""; };
+    tagIn.onkeydown = e => { if (e.key === "Enter" || e.key === ","){ e.preventDefault(); add(); } else if (e.key === "Backspace" && !tagIn.value && S.userCats.length){ S.userCats.pop(); markMeta(); renderAiBody(); $("#tagIn").focus(); } };
+    tagIn.onblur = () => { if (tagIn.value.trim()) add(); };
+  }
+  host.onclick = e => {
+    const rm = e.target.closest("[data-rm]"); if (rm){ S.userCats.splice(Number(rm.dataset.rm), 1); markMeta(); renderAiBody(); return; }
+    const a = e.target.closest("[data-act]"); if (!a) return;
+    if (a.dataset.act === "close") closeSheet();
+    if (a.dataset.act === "run") runSort();
+    if (a.dataset.act === "key") openKeySheet(openAi);
+    if (a.dataset.act === "stop" && run.ctl) run.ctl.abort();
+  };
+}
+function updateRunArea(){
+  const el = $("#runArea");
+  if (el) el.innerHTML = run.active
+    ? '<div class="runbox"><div>' + esc(run.label || "Starting…") + '</div><div class="prog' + (run.frac == null ? " indet" : "") + '"><i style="width:' + Math.round((run.frac || 0) * 100) + '%"></i></div></div>'
+    : run.msg ? '<div class="runbox ' + (run.err ? "err" : "plain") + '">' + esc(run.msg) + '</div>' : "";
+  const hb = $('#top [data-act="ai"]'); if (hb) hb.textContent = run.active ? "Sorting…" : "Sort with AI";
+}
+
+/* ---------- render ---------- */
+const LOGO = '<svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="rcg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF6B8B"/><stop offset="1" stop-color="#A35BFF"/></linearGradient></defs>' +
+  '<rect width="64" height="64" rx="16" fill="url(#rcg)"/><path d="M22 16h20a5 5 0 0 1 5 5v31l-15-7-15 7V21a5 5 0 0 1 5-5z" fill="#fff"/>' +
+  '<path d="M29 26v10l8.5-5z" fill="url(#rcg)" stroke="url(#rcg)" stroke-width="2.5" stroke-linejoin="round"/><path d="M50 7l1.7 4.6L56.3 13l-4.6 1.7L50 19.3l-1.7-4.6L43.7 13l4.6-1.4z" fill="#FFC24B"/></svg>';
+function filteredPosts(){
+  const q = state.query.trim().toLowerCase().replace(/^[@#]/, "");
+  return state.posts.filter(p => {
+    if (state.filter === "none" && p.c) return false;
+    if (state.filter !== "all" && state.filter !== "none" && p.c !== state.filter) return false;
+    if (q && ![p.o, p.on, p.n, p.cap, p.x, p.tr, (p.h || []).join(" ")].some(v => (v || "").toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+function render(){
+  renderTop();
+  if (!state.loaded) return;
+  if (!state.posts.length){ renderEmpty(); $("#selbar").hidden = true; $("#askbar").hidden = true; return; }
+  state.view === "cats" ? renderShelves() : state.view === "ask" ? renderAsk() : renderGrid();
+  $("#askbar").hidden = state.view !== "ask";
+  renderSelbar();
+}
+let toastT = null;
+function toast(text, err){
+  const t = $("#toast"); if (!text) return;
+  t.textContent = text; t.classList.toggle("err", !!err); t.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, err ? 9000 : 5000);
+}
+$("#toast").onclick = () => { $("#toast").hidden = true; };
+function menuHtml(){
+  return '<div class="menu"><button class="iconbtn" data-act="menu" aria-label="More options" aria-haspopup="true">' + ICON.dots + '</button><div class="pop" id="pop" hidden>' +
+    '<button data-act="import">Import files</button>' +
+    (OWNKEY && !NATIVE && state.posts.length ? '<button data-act="savefile">Save to phone</button>' : '') +
+    (OWNKEY && !NATIVE ? '<button data-act="import">Open a saved library</button>' : '') +
+    (OWNKEY ? '<button data-act="ig">Get new saves from Instagram</button>' : '') +
+    (OWNKEY ? '<button data-act="key">' + (aiCfg().key ? "AI key" : "Add AI key") + '</button>' : '') +
+    (state.posts.length ? '<button data-act="newcat">New category</button>' : '') +
+    (state.posts.some(p => p.x) && !state.colImported ? '<button data-act="cols">Use my Instagram collections</button>' : '') +
+    ((downloadsNS || OWNKEY) && state.posts.length ? '<button data-act="export">' + (NATIVE ? "Back up (share file)" : "Download sorted list") + '</button>' : '') +
+    (state.cats.length ? '<button data-act="clearcats" class="danger">Clear all categories</button>' : '') +
+    (state.libs.length ? '<hr><div class="grp">Libraries</div>' + state.libs.map(l => '<button data-lib="' + l.id + '"><span class="ck">' + (state.lib && l.id === state.lib.id ? ICON.tick : "") + '</span>' + esc(l.name) + '</button>').join("") +
+      (state.lib ? '<button data-act="renamelib"><span class="ck"></span>Rename library</button><button data-act="dellib" class="danger"><span class="ck"></span>Delete library</button>' : '') : '') +
+    '<hr>' + syncHtml() + '</div></div>';
+}
+function renderTop(){
+  const top = $("#top"), brand = '<h1 class="brand">' + LOGO + 'Reelcall</h1><span class="grow"></span>';
+  if (!state.loaded || !state.posts.length){ top.innerHTML = '<div class="titlebar">' + brand + (state.loaded && state.libs.length ? menuHtml() : "") + '</div>'; return; }
+  const counts = countBy(), none = counts.get(null) || 0;
+  const cats = state.cats.slice().sort((a, b) => (counts.get(b.id) || 0) - (counts.get(a.id) || 0));
+  const fs = document.activeElement && document.activeElement.id === "q", caret = fs ? document.activeElement.selectionStart : 0;
+  top.innerHTML =
+    '<div class="titlebar">' + brand + (aiAvailable ? '<button class="btn ai" data-act="ai">' + (run.active ? "Sorting…" : "Sort with AI") + '</button>' : '') + menuHtml() + '</div>' +
+    '<div class="count">' + plural(state.posts.length, "save") + ' in ' + plural(state.cats.length, "category", "categories") + (state.libs.length > 1 ? ', ' + esc(state.lib.name) : '') + '</div>' +
+    '<div class="tabs" role="tablist"><button role="tab" data-view="cats" aria-selected="' + (state.view === "cats") + '">Categories</button><button role="tab" data-view="list" aria-selected="' + (state.view === "list") + '">All</button><button role="tab" data-view="ask" aria-selected="' + (state.view === "ask") + '">Ask</button></div>' +
+    (state.view === "list" ?
+      '<div class="tools"><input class="search" id="q" type="search" placeholder="Search captions, creators, hashtags" value="' + esc(state.query) + '" aria-label="Search">' +
+        '<button class="link" data-act="select">' + (state.selecting ? "Done" : "Select") + '</button></div>' +
+      '<div class="chips">' + chip("all", "All", null) + cats.map(c => chip(c.id, c.name, c.color)).join("") + (none ? chip("none", "Uncategorized", "var(--none)") : "") + '</div>' : '');
+  if (fs){ const q = $("#q"); q.focus(); try { q.setSelectionRange(caret, caret); } catch {} }
+  function chip(f, name, color){ return '<button class="chip" data-f="' + f + '" aria-pressed="' + (state.filter === f) + '"' + (color ? ' style="--c:' + color + '"><i></i>' : '>') + esc(name) + '</button>'; }
+}
+function saveHintHtml(){
+  return OWNKEY && !NATIVE && state.fileDirty && state.posts.length ? '<div class="notice"><span>Keep your sorting safe on your phone.</span><button class="btn primary" data-act="savefile">Save to phone</button></div>' : '';
+}
+function staleHtml(){
+  const bare = state.posts.filter(p => p.o === "unknown" && !rich(p)).length;
+  return bare > state.posts.length / 3 ? '<div class="notice"><span>Your posts are missing captions. Import saved_posts.json again to fill them in.</span><button class="btn" data-act="import">Import</button></div>' : '';
+}
+function renderEmpty(){
+  $("#main").innerHTML =
+    '<section class="empty"><div class="fan" aria-hidden="true"><span style="--h:345"></span><span style="--h:265"></span><span style="--h:28"></span></div><h2>Your saves, finally sorted.</h2>' +
+    '<ol class="steps">' +
+      '<li><span>In Instagram: Accounts Center, Your information and permissions, Export your information.</span></li>' +
+      '<li><span>Pick <b>Saved</b> and set the format to <b>JSON</b>.</span></li>' +
+      '<li><span>Drop the downloaded .zip or saved_posts.json here.</span></li>' +
+    '</ol>' +
+    '<div class="drop" id="drop"><button class="btn primary big" data-act="import">Choose files</button><p>or drop them here</p></div>' +
+    (NATIVE ? '<p style="text-align:center;margin-top:16px"><button class="btn" data-act="ig">Or fetch straight from Instagram</button></p>' : '') +
+    (OWNKEY && !NATIVE ? '<p style="text-align:center;margin-top:16px;color:var(--muted);font-size:14px">Already saved a library to your phone? Choose <b>reelcall-library.html</b> above to open it.</p>' : '') + '</section>';
+  const el = $("#drop");
+  el.ondragover = e => { e.preventDefault(); el.classList.add("over"); };
+  el.ondragleave = () => el.classList.remove("over");
+  el.ondrop = e => { e.preventDefault(); el.classList.remove("over"); if (e.dataTransfer.files.length) importFiles([...e.dataTransfer.files]); };
+}
+function snippet(p){
+  if (p.n && p.n.trim()) return p.n;
+  if (p.cap){ const t = p.cap.replace(/#[\p{L}\p{N}_]+/gu, "").replace(/\s+/g, " ").trim(); if (t) return t; }
+  if (p.h && p.h.length) return p.h.slice(0, 6).map(h => "#" + h).join(" ");
+  if (p.tr) return "\u201C" + p.tr.slice(0, 140) + "\u201D";
+  return p.on || "";
+}
+function mediaHtml(p){
+  if (NATIVE && p.img) return '<p class="txt">' + esc(snippet(p) || "") + '</p><img loading="lazy" alt="" data-k="' + esc(p.k) + '" src="' + esc(p.img) + '" onerror="igImgFail(this)">';
+  if (OWNKEY) return '<p class="txt">' + esc(snippet(p) || (p.t === "reel" ? "Reel" : "Post")) + '</p><iframe class="emb" loading="lazy" tabindex="-1" aria-hidden="true" scrolling="no" src="https://www.instagram.com/p/' + encodeURIComponent(p.k) + '/embed/"></iframe>';
+  if (p.th) return '<img loading="lazy" alt="" src="/_blob/' + esc(p.th) + '">';
+  return '<p class="txt">' + esc(snippet(p) || (p.t === "reel" ? "Reel" : "Post")) + '</p>';
+}
+function tileHtml(p){
+  const c = p.c ? catById(p.c) : null, sel = state.selected.has(p.k), selecting = state.selecting && state.view === "list";
+  return '<div class="tile' + (OWNKEY || p.th ? " pic" : "") + (selecting ? " selecting" : "") + (sel ? " sel" : "") + '" data-k="' + esc(p.k) + '" style="--h:' + hue(p.o) + ';--c:' + (c ? c.color : "var(--none)") + '">' +
+    mediaHtml(p) +
+    '<span class="who">' + (state.view === "list" && state.filter === "all" && c ? '<i></i>' : '') + (p.t === "reel" ? ICON.play : '') + '<span>@' + esc(p.o) + '</span></span>' +
+    (selecting ? '<span class="check">' + (sel ? ICON.tick : "") + '</span>'
+      : '<a class="cover" href="' + esc(p.u) + '" target="_blank" rel="noopener noreferrer" aria-label="Watch @' + esc(p.o) + ' on Instagram"></a>' +
+        (p.ext ? '<button class="more add" data-add="' + esc(p.k) + '" aria-label="Add to Reelcall">+</button>' : '<button class="more" data-edit="' + esc(p.k) + '" aria-label="Edit @' + esc(p.o) + ' post">' + ICON.dots + '</button>')) +
+  '</div>';
+}
+function renderShelves(){
+  const counts = countBy(), none = counts.get(null) || 0;
+  const cats = state.cats.filter(c => counts.get(c.id)).sort((a, b) => counts.get(b.id) - counts.get(a.id));
+  const sec = (id, name, color, posts) => '<section class="sec"><div class="sechead"><i style="background:' + color + '"></i><h3>' + esc(name) + '</h3><span class="n">' + posts.length.toLocaleString() + '</span>' +
+    '<button class="link" data-see="' + id + '">See all</button></div><div class="shelf">' + posts.slice(0, 24).map(tileHtml).join("") + '</div></section>';
+  $("#main").innerHTML = saveHintHtml() + staleHtml() +
+    (OWNKEY && !igState().on && !igState().last && !igState().bm ? '<div class="notice"><span>Get new saves automatically from Instagram.</span><button class="btn" data-act="ig">Set up</button></div>' : '') +
+    (OWNKEY && !aiCfg().key ? '<div class="notice"><span>Paste an AI key to sort and search your saves.</span><button class="btn primary" data-act="key">Add AI key</button></div>' : cats.length ? "" : '<div class="notice"><span>Tap Sort with AI to group your saves into categories.</span></div>') +
+    cats.map(c => sec(c.id, c.name, c.color, state.posts.filter(p => p.c === c.id))).join("") +
+    (none ? sec("none", "Uncategorized", "var(--none)", state.posts.filter(p => !p.c)) : "");
+}
+function renderGrid(){
+  const list = filteredPosts(), c = catById(state.filter), shown = list.slice(0, state.shown);
+  $("#main").innerHTML = staleHtml() +
+    (c ? '<div class="viewhead"><h2>' + esc(c.name) + '</h2><button class="link" data-act="rename">Rename</button><button class="link danger" data-act="delcat">Delete</button></div>' : '<div style="height:12px"></div>') +
+    (list.length ? '<div class="grid">' + shown.map(tileHtml).join("") + '</div>' +
+      (list.length > shown.length ? '<button class="btn more-btn" data-act="more">Show more</button>' : '')
+      : '<div class="blank">' + (state.query ? "No posts match your search." : "Nothing here yet.") + '</div>');
+}
+function renderSelbar(){
+  const bar = $("#selbar");
+  if (!state.selecting || state.view !== "list"){ bar.hidden = true; return; }
+  bar.hidden = false; const n = state.selected.size;
+  bar.innerHTML = '<div class="in"><b>' + plural(n, "post") + ' selected</b><select class="input" id="moveTo"' + (n ? "" : " disabled") + ' aria-label="Move selected posts to"><option value="__">Move to…</option>' + catOptions(null) + '</select>' +
+    '<button class="btn danger" data-act="seldel"' + (n ? "" : " disabled") + '>Remove</button><button class="btn" data-act="selcancel">Cancel</button></div>';
+  $("#moveTo").onchange = async e => {
+    let v = e.target.value; if (v === "__") return;
+    if (v === "__new"){ const c = await newCategory(); if (!c){ renderSelbar(); return; } v = c.id; }
+    for (const p of state.posts) if (state.selected.has(p.k)) Object.assign(p, { c: v || null, l: true, ai: false, f: null });
+    state.selected.clear(); state.selecting = false; markAll(); render();
+  };
+  bar.onclick = async e => {
+    const a = e.target.closest("[data-act]"); if (!a) return;
+    if (a.dataset.act === "selcancel"){ state.selecting = false; state.selected.clear(); render(); }
+    if (a.dataset.act === "seldel" && await deletePosts(state.selected)){ state.selected.clear(); state.selecting = false; render(); }
+  };
+}
+
+/* ---------- Instagram sync (Android app only) ---------- */
+// Reads your Saved list through Instagram's own website session inside the app. Unofficial: Instagram can change it at any time.
+const IGK = "savesort:ig";
+const igState = () => { try { return Object.assign({ on: false, auto: true, sort: true, last: 0, pending: false }, JSON.parse(localStorage.getItem(IGK) || "{}")); } catch { return { on: false, auto: true, sort: true, last: 0, pending: false }; } };
+const setIg = v => { try { localStorage.setItem(IGK, JSON.stringify(v)); } catch {} };
+window.igImgFail = img => { const f = document.createElement("iframe"); f.className = "emb"; f.scrolling = "no"; f.setAttribute("aria-hidden", "true"); f.src = "https://www.instagram.com/p/" + encodeURIComponent(img.dataset.k) + "/embed/"; img.replaceWith(f); };
+let igBusy = false;
+async function igPage(maxId){
+  const q = maxId ? "?max_id=" + encodeURIComponent(maxId) : "";
+  const headers = { "X-IG-App-ID": "936619743392459", "X-Requested-With": "XMLHttpRequest", Accept: "application/json", Referer: "https://www.instagram.com/", "User-Agent": navigator.userAgent };
+  let last = { code: "ig_error", message: "no response" };
+  for (const u of ["https://www.instagram.com/api/v1/feed/saved/posts/", "https://i.instagram.com/api/v1/feed/saved/posts/"]){
+    try {
+      const r = await fetch(u + q, { headers, credentials: "include" }), t = await r.text();
+      let j = null; try { j = JSON.parse(t); } catch {}
+      if (r.status === 401 || r.status === 403 || (j && (j.require_login || j.message === "login_required")) || (!j && /accounts\/login/i.test(t))) throw { code: "login" };
+      if (j && Array.isArray(j.items)) return j;
+      last = { code: "ig_error", message: (j && (j.message || j.status)) || "HTTP " + r.status };
+    } catch (e) { if (e && e.code === "login") throw e; last = e && e.code ? e : { code: "ig_error", message: String((e && e.message) || e) }; }
+  }
+  throw last;
+}
+function igToPost(m){
+  if (!m || !m.code) return null;
+  const media = m.carousel_media && m.carousel_media[0] && !m.image_versions2 ? m.carousel_media[0] : m;
+  const cands = ((media.image_versions2 || {}).candidates || []).slice().sort((a, b) => a.width - b.width);
+  const img = (cands.find(c => c.width >= 320) || cands[cands.length - 1] || {}).url || null;
+  const cap = m.caption && m.caption.text ? String(m.caption.text).slice(0, 600) : null, u = m.user || m.owner || {};
+  const reel = m.product_type === "clips" || m.media_type === 2;
+  return { k: m.code, u: "https://www.instagram.com/" + (reel ? "reel" : "p") + "/" + m.code + "/", o: u.username || "instagram", on: u.full_name ? String(u.full_name).slice(0, 80) : null,
+    t: reel ? "reel" : "post", cap, h: cap ? [...new Set((cap.match(/#[\p{L}\p{N}_]+/gu) || []).map(x => x.slice(1)))].slice(0, 30) : [], img, pd: m.taken_at || null };
+}
+async function syncInstagram(quiet){
+  if (!NATIVE || igBusy) return;
+  igBusy = true;
+  const ig = igState(), byK = new Map(state.posts.map(p => [p.k, p])), fresh = [];
+  let maxId = null, pages = 0, reachedKnown = false;
+  if (!quiet) toast("Checking Instagram for new saves…");
+  try {
+    while (pages < 15){
+      const j = await igPage(maxId); pages++;
+      for (const it of j.items){
+        const x = igToPost(it.media || it); if (!x) continue;
+        const had = byK.get(x.k);
+        if (had){ reachedKnown = true; if (x.img) had.img = x.img; for (const k of ["cap", "on", "pd"]) if (x[k] && !had[k]) had[k] = x[k]; if (x.h.length && !(had.h && had.h.length)) had.h = x.h; if (had.o === "unknown" || had.o === "instagram") had.o = x.o; }
+        else if (!fresh.some(f => f.k === x.k)) fresh.push(x);
+      }
+      if (reachedKnown || fresh.length >= 300 || !j.more_available || !j.next_max_id) break;
+      maxId = j.next_max_id; await sleep(1500 + Math.random() * 1500);
+    }
+    if (!state.lib) await createLib("My saves");
+    const t0 = nowS();
+    const added = fresh.map((x, i) => { const p = { k: x.k, u: x.u, o: x.o, t: x.t, s: t0 - i, est: 1, c: null, f: null, l: false, ai: false, n: "", src: "instagram" }; for (const k of ["on", "cap", "img", "pd"]) if (x[k]) p[k] = x[k]; if (x.h.length) p.h = x.h; return p; });
+    state.posts = added.concat(state.posts);
+    Object.assign(ig, { on: true, last: t0, pending: false }); setIg(ig);
+    markAll(); render();
+    if (added.length) toast("Added " + plural(added.length, "new save") + " from Instagram"); else if (!quiet) toast("You're up to date");
+    if (added.length && ig.sort && state.cats.length && aiCfg().key) autoSortNew(added);
+  } catch (e) {
+    if (e && e.code === "login"){ Object.assign(ig, { on: false }); setIg(ig); if (!quiet) openIgSheet(); else toast("Log in to Instagram again to keep fetching new saves (⋯ → Instagram sync)."); }
+    else toast("Couldn't fetch from Instagram (" + String((e && e.message) || "error").slice(0, 100) + ").", true);
+  } finally { igBusy = false; }
+}
+async function autoSortNew(posts){
+  const sample = await getSample(); if (!sample || run.active) return;
+  const names = state.cats.map(c => c.name); if (!names.length) return;
+  Object.assign(run, { active: true, ctl: new AbortController(), msg: null, err: false }); renderTop();
+  try {
+    const left = await classifyAll(sample, buildItems(posts.filter(p => !p.l)), names, "Sorting new saves", state.settings.threshold);
+    for (const it of left) for (const p of it.posts){ p.c = null; p.ai = false; }
+    toast("Sorted " + plural(posts.filter(p => p.c).length, "new save") + " into your categories");
+  } catch (e) { toast(errText(e), true); }
+  finally { Object.assign(run, { active: false, ctl: null }); markAll(); render(); }
+}
+const APP_URL = /^https?:/.test(location.href) ? location.href.split("#")[0] : null;
+function bookmarkletCode(){
+  const code = "(async()=>{const APP=" + JSON.stringify(APP_URL) + ";" +
+    "if(!/(^|\\.)instagram\\.com$/.test(location.hostname)){alert('Open instagram.com (logged in) first, then tap this bookmark.');return;}" +
+    "const n=Math.min(+prompt('Reelcall: how many of your most recent saves?','100')||0,1000);if(!n)return;" +
+    "const box=document.createElement('div');box.style.cssText='position:fixed;z-index:2147483647;left:12px;right:12px;bottom:16px;padding:14px;border-radius:12px;background:linear-gradient(135deg,#FF6B8B,#A35BFF);color:#fff;font:600 15px/1.4 sans-serif;text-align:center';document.body.append(box);" +
+    "const H={'X-IG-App-ID':'936619743392459','X-Requested-With':'XMLHttpRequest'};const out=[];let max='',i=0;" +
+    "try{while(out.length<n){box.textContent='Reelcall: fetching your saves… '+out.length;" +
+    "const r=await fetch('/api/v1/feed/saved/posts/'+(max?'?max_id='+encodeURIComponent(max):''),{headers:H,credentials:'include'});" +
+    "if(!r.ok)throw new Error('Instagram answered '+r.status+(r.status==401||r.status==403?'. Log in to Instagram first.':''));" +
+    "const j=await r.json();for(const it of j.items||[]){const m=it.media||it;if(!m||!m.code)continue;const u=m.user||{};" +
+    "out.push({url:'https://www.instagram.com/'+((m.product_type=='clips'||m.media_type==2)?'reel':'p')+'/'+m.code+'/',owner:u.username||'',creatorName:u.full_name||'',caption:((m.caption&&m.caption.text)||'').slice(0,600),rank:i++});}" +
+    "if(!j.more_available||!j.next_max_id)break;max=j.next_max_id;await new Promise(z=>setTimeout(z,1200+Math.random()*800));}" +
+    "const data=JSON.stringify({source:'savesort-ig',posts:out.slice(0,n)});" +
+    "if(APP&&data.length<1500000){box.textContent='Reelcall: opening your library…';location.href=APP+'#ig='+encodeURIComponent(data);return;}" +
+    "const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download='reelcall_instagram.json';document.body.append(a);a.click();" +
+    "box.textContent='Reelcall: downloaded reelcall_instagram.json with '+out.length+' saves. Open Reelcall and import it.';setTimeout(()=>box.remove(),9000);" +
+    "}catch(e){box.style.background='#E5484D';box.textContent='Reelcall: '+e.message;setTimeout(()=>box.remove(),9000);}})();";
+  return "javascript:" + encodeURIComponent(code);
+}
+async function importFromInstagram(found){
+  if (!found.length) return;
+  if (!state.lib) await createLib("My saves");
+  const before = new Set(state.posts.map(p => p.k));
+  const r = mergeFound(found, 0);
+  const added = state.posts.filter(p => !before.has(p.k));
+  const ig = igState(); ig.last = nowS(); ig.on = true; setIg(ig);
+  markAll(); state.view = "cats"; render();
+  toast(added.length ? "Added " + plural(added.length, "new save") + " from Instagram" : "You're up to date" + (r.enriched ? ", details refreshed" : ""));
+  if (added.length && ig.sort && aiCfg().key) sortNew(added, false);
+}
+function openBookmarkSheet(){
+  const ig = igState(), code = bookmarkletCode();
+  openSheet("ig",
+    '<div class="sheethead"><div><h3>Get new saves from Instagram</h3><div class="sub">A Chrome bookmark that reads your Saved list while you\'re on instagram.com' + (APP_URL ? ' and brings the new ones straight back here' : '') + '.</div></div><button class="iconbtn" data-act="close" aria-label="Close">' + ICON.close + '</button></div>' +
+    '<ol class="steps" style="margin:4px 0 8px">' +
+      '<li><span>Tap <b>Copy bookmark</b> below.</span></li>' +
+      '<li><span>In Chrome, tap ⋮ then ☆ to bookmark any page. Tap <b>Edit</b>, name it <b>Reelcall</b>, and replace the URL with what you copied.</span></li>' +
+      '<li><span>Open <b>instagram.com</b> in Chrome (logged in). Tap the address bar, type <b>Reelcall</b>, and tap the bookmark.</span></li>' +
+      '<li><span>' + (APP_URL ? 'It fetches your latest saves and returns here with them added and sorted.' : 'It downloads <b>reelcall_instagram.json</b>. Import it here with ⋯ → Import files.') + '</span></li>' +
+    '</ol>' +
+    '<textarea class="input" id="bmCode" readonly rows="3" style="font-size:12px">' + esc(code) + '</textarea>' +
+    '<div class="field radios"><label><input type="checkbox" id="igSort"' + (ig.sort ? " checked" : "") + '> Sort new saves into my categories with AI</label></div>' +
+    (APP_URL ? '' : '<p class="sub">Opened as a file, Reelcall can\'t be reopened automatically. Put it on GitHub Pages to make this fully automatic.</p>') +
+    '<p class="sub">This reads Instagram\'s website the way the page itself does, not an official API, so Instagram may change it.</p>' +
+    '<div class="actions"><button class="btn primary" data-act="bmcopy">Copy bookmark</button></div>',
+    s => {
+      $("#igSort", s).onchange = e => { const v = igState(); v.sort = e.target.checked; setIg(v); };
+      s.onclick = async e => {
+        const a = e.target.closest("[data-act]"); if (!a) return;
+        if (a.dataset.act === "close") closeSheet();
+        if (a.dataset.act === "bmcopy"){
+          const ta = $("#bmCode", s); let ok = false;
+          try { await navigator.clipboard.writeText(ta.value); ok = true; } catch { ta.focus(); ta.select(); try { ok = document.execCommand("copy"); } catch {} }
+          const v = igState(); v.bm = true; setIg(v);
+          toast(ok ? "Copied. Now add it as a Chrome bookmark." : "Select the text above and copy it.");
+        }
+      };
+    });
+}
+function openIgSheet(){
+  if (!NATIVE) return openBookmarkSheet();
+  const ig = igState();
+  openSheet("ig",
+    '<div class="sheethead"><div><h3>Instagram sync</h3><div class="sub">New saves show up here automatically. You log in on Instagram\'s own page, so your password goes only to Instagram.</div></div><button class="iconbtn" data-act="close" aria-label="Close">' + ICON.close + '</button></div>' +
+    '<div class="keyline"><span>' + (ig.on ? "Connected" + (ig.last ? ", last checked " + new Date(ig.last * 1000).toLocaleString() : "") : "Not connected yet") + '</span></div>' +
+    (ig.on ? '' : '<ol class="steps" style="margin:14px 0 4px"><li><span>Tap <b>Log in to Instagram</b>.</span></li><li><span>Log in as usual.</span></li><li><span>Press your phone\'s <b>Back</b> button to return here. New saves load on their own.</span></li></ol>') +
+    '<div class="field radios"><label><input type="checkbox" id="igAuto"' + (ig.auto ? " checked" : "") + '> Check for new saves every time I open the app</label>' +
+      '<label><input type="checkbox" id="igSort"' + (ig.sort ? " checked" : "") + '> Sort new saves into my categories with AI</label></div>' +
+    '<p class="sub">This uses Instagram\'s website the way a browser does, not an official API. Instagram may change it or ask you to log in again.</p>' +
+    '<div class="actions">' + (ig.on ? '<button class="btn" data-act="iglogin">Log in again</button><button class="btn primary" data-act="igcheck">Check now</button>' : '<button class="btn primary" data-act="iglogin">Log in to Instagram</button>') + '</div>',
+    s => {
+      $("#igAuto", s).onchange = e => { const v = igState(); v.auto = e.target.checked; setIg(v); };
+      $("#igSort", s).onchange = e => { const v = igState(); v.sort = e.target.checked; setIg(v); };
+      s.onclick = e => {
+        const a = e.target.closest("[data-act]"); if (!a) return;
+        if (a.dataset.act === "close") closeSheet();
+        if (a.dataset.act === "igcheck"){ closeSheet(); syncInstagram(false); }
+        if (a.dataset.act === "iglogin"){ const v = igState(); v.pending = true; setIg(v); flushNow().then(() => { location.href = "https://www.instagram.com/accounts/login/"; }); }
+      };
+    });
+}
+
+/* ---------- ask (chat) ---------- */
+const STOP = new Set("a an the of to in on for and or with about from my me i im it its is are was be that this those these which what where who how show find get give want need some any saved save insta instagram reel reels video videos post posts please can you u related like something thing things one ones all".split(" "));
+const terms = q => [...new Set(String(q).toLowerCase().replace(/[^\p{L}\p{N}#@_ ]+/gu, " ").split(/\s+/).map(t => t.replace(/^[#@]+/, "")).filter(t => t.length > 1 && !STOP.has(t)))];
+const extMeta = new Map();
+let asking = false;
+function scorePosts(ts){
+  if (!ts.length) return [];
+  const out = [];
+  for (const p of state.posts){
+    const c = p.c ? catById(p.c) : null;
+    const hay = [p.cap, p.n, p.tr, p.on, c && c.name].join(" ").toLowerCase(), tags = (p.h || []).join(" ").toLowerCase(), who = (p.o || "").toLowerCase();
+    let sc = 0;
+    for (const t of ts){ if (tags.includes(t)) sc += 3; if (who.includes(t)) sc += 3; if (hay.includes(t)) sc += 2; }
+    if (sc) out.push([sc, p]);
+  }
+  return out.sort((a, b) => b[0] - a[0] || (b[1].s || 0) - (a[1].s || 0)).map(x => x[1]);
+}
+const lineFor = (p, i) => i + " | @" + p.o + (p.c && catById(p.c) ? " | category: " + catById(p.c).name : "") + (p.cap ? ' | "' + p.cap.replace(/\s+/g, " ").slice(0, 200) + '"' : "") + (p.h && p.h.length ? " | " + p.h.slice(0, 8).map(h => "#" + h).join(" ") : "") + (p.n ? ' | note: "' + p.n + '"' : "");
+async function askSaves(q){
+  const sample = await getSample(), useAI = !!sample && (!OWNKEY || !!aiCfg().key);
+  let kws = terms(q);
+  if (useAI){
+    try {
+      const r = await ask4json(sample, 'Someone is searching their saved Instagram posts with this request: "' + q + '"\nList 8 to 15 short keywords and hashtag words (lowercase, no #) likely to appear in the captions or hashtags of matching posts, including synonyms and related terms, in English and Hinglish where it helps. Reply with only JSON: {"keywords":["word"]}', "quick");
+      if (r && Array.isArray(r.keywords)) kws = [...new Set([...kws, ...r.keywords.flatMap(k => terms(k))])];
+    } catch {}
+  }
+  const cands = scorePosts(kws).slice(0, 60);
+  if (!useAI || !cands.length) return { reply: cands.length ? "Closest matches in your saves:" : "Nothing in your saves matches that.", picks: cands.slice(0, 12) };
+  try {
+    const r = await ask4json(sample, 'A person asked: "' + q + '"\nBelow are candidate posts from their saved Instagram posts. Pick the ones that genuinely match the request, best first, at most 12. If none match, return an empty list.\nReply with only JSON: {"reply":"one short friendly sentence for the person","picks":[0,3]}\n\nPosts:\n' + cands.map(lineFor).join("\n"), "quick");
+    const picks = [...new Set((Array.isArray(r.picks) ? r.picks : []).map(Number).filter(i => Number.isInteger(i) && cands[i]).map(i => cands[i]))].slice(0, 12);
+    return { reply: String(r.reply || (picks.length ? "Found these in your saves." : "I couldn't find that in your saves.")).slice(0, 300), picks };
+  } catch { return { reply: "Closest matches in your saves:", picks: cands.slice(0, 12) }; }
+}
+async function searchWeb(q){
+  const r = await apiSample('Use web search to find public Instagram reels or posts about: "' + q + '". Only include links you actually saw in the search results, written as https://www.instagram.com/reel/CODE/ or https://www.instagram.com/p/CODE/. Reply with only JSON: {"results":[{"url":"","creator":"","title":"short description"}]} with up to 8 results.', { web: true });
+  let j = {}; try { j = looseJson(r.text); } catch {}
+  const out = [], seen = new Set();
+  for (const x of (j.results || [])){
+    const m = String((x && x.url) || "").match(POST_RE); if (!m || seen.has(m[2])) continue; seen.add(m[2]);
+    out.push({ k: m[2], u: "https://www.instagram.com/" + (m[1] === "p" ? "p" : "reel") + "/" + m[2] + "/", o: String(x.creator || "").replace(/^@/, "").slice(0, 40) || "instagram", t: m[1] === "p" ? "post" : "reel", cap: String(x.title || "").slice(0, 300), ext: true });
+  }
+  return out;
+}
+async function addExternal(x){
+  const had = state.posts.find(p => p.k === x.k); if (had) return { post: had, existed: true };
+  if (!state.lib) await createLib("My saves");
+  const p = { k: x.k, u: x.u, o: x.o || "instagram", t: x.t, s: nowS(), c: null, f: null, l: false, ai: false, n: "", src: "found" };
+  if (x.cap) p.cap = x.cap;
+  state.posts.unshift(p); markAll(); renderTop(); return { post: p, existed: false };
+}
+function chatMsgHtml(m, i){
+  if (m.role === "user") return '<div class="msg me" data-i="' + i + '">' + esc(m.text) + '</div>';
+  const canWeb = OWNKEY && canWebSearch(aiCfg());
+  return '<div class="msg bot" data-i="' + i + '"><div class="say' + (m.pending ? " pending" : "") + '">' + esc(m.text) + '</div>' +
+    (m.posts && m.posts.length ? '<div class="shelf">' + m.posts.map(tileHtml).join("") + '</div>' : '') +
+    (m.q && !m.pending ? '<div class="acts">' + (canWeb ? '<button class="btn" data-web="' + i + '">Find more on Instagram</button>' : '') +
+      '<a class="btn" href="https://www.instagram.com/explore/search/keyword/?q=' + encodeURIComponent(m.q) + '" target="_blank" rel="noopener noreferrer">Search Instagram</a>' +
+      (canWeb ? '' : '<a class="btn" href="https://www.google.com/search?q=' + encodeURIComponent("site:instagram.com/reel " + m.q) + '" target="_blank" rel="noopener noreferrer">Search Google</a>') + '</div>' : '') +
+  '</div>';
+}
+function renderAsk(){
+  if ($("#chat")) return;
+  $("#main").innerHTML = '<div id="chat" class="chat">' + (state.chat.length ? state.chat.map(chatMsgHtml).join("")
+    : '<div class="blank">Ask for anything in your saves, like <b>Korean cafe in Hyderabad</b> or <b>AI agent roadmaps</b>.<br>Paste an Instagram link to add it.</div>') + '</div>';
+  scrollChat();
+}
+function pushMsg(m){
+  state.chat.push(m); const i = state.chat.length - 1, chat = $("#chat");
+  if (chat){ const b = chat.querySelector(".blank"); if (b) b.remove(); chat.insertAdjacentHTML("beforeend", chatMsgHtml(m, i)); scrollChat(); }
+  return i;
+}
+function updateMsg(i){ const el = document.querySelector('#chat .msg[data-i="' + i + '"]'); if (el) el.outerHTML = chatMsgHtml(state.chat[i], i); scrollChat(); }
+function scrollChat(){ requestAnimationFrame(() => window.scrollTo(0, document.body.scrollHeight)); }
+async function sendAsk(text){
+  text = String(text || "").trim(); if (!text || asking) return;
+  asking = true; pushMsg({ role: "user", text });
+  const links = [...text.matchAll(new RegExp(POST_RE.source, "g"))];
+  const bot = { role: "bot", text: links.length ? "Adding…" : "Looking through your saves…", pending: true }, bi = pushMsg(bot);
+  try {
+    if (links.length){
+      const added = [], had = [];
+      for (const m of links){ const r = await addExternal({ k: m[2], u: "https://www.instagram.com/" + (m[1] === "p" ? "p" : "reel") + "/" + m[2] + "/", t: m[1] === "p" ? "post" : "reel" }); (r.existed ? had : added).push(r.post); }
+      bot.text = [added.length ? "Added " + plural(added.length, "post") + " to Reelcall. Tap ⋯ to pick a category." : "", had.length ? "Already in your saves: " + had.length + "." : ""].filter(Boolean).join(" ");
+      bot.posts = [...added, ...had];
+    } else {
+      const r = await askSaves(text);
+      bot.text = r.reply; bot.posts = r.picks; bot.q = text;
+    }
+  } catch { bot.text = "Something went wrong. Try again."; }
+  bot.pending = false; updateMsg(bi); asking = false;
+}
+async function webSearch(i){
+  const q = state.chat[i] && state.chat[i].q; if (!q || asking) return;
+  asking = true;
+  const bot = { role: "bot", text: "Searching Instagram via the web…", pending: true }, bi = pushMsg(bot);
+  try {
+    const res = await searchWeb(q), saved = new Map(state.posts.map(p => [p.k, p]));
+    bot.posts = res.map(x => saved.get(x.k) || (extMeta.set(x.k, x), x));
+    bot.text = res.length ? "Found these online. Tap + to add one to Reelcall." : "No Instagram links turned up for that. Try Search Instagram above.";
+  } catch (e) { bot.text = errText(e).replace(" Posts sorted so far are kept.", ""); }
+  bot.pending = false; updateMsg(bi); asking = false;
+}
+async function addFound(k){
+  const x = extMeta.get(k); if (!x) return;
+  const r = await addExternal(x);
+  state.chat.forEach((m, i) => { if (m.posts && m.posts.some(p => p.k === k)){ m.posts = m.posts.map(p => p.k === k ? r.post : p); updateMsg(i); } });
+  toast(r.existed ? "Already in your saves" : "Added to Reelcall");
+  openDetail(k);
+}
+const askbar = $("#askbar");
+askbar.innerHTML = '<div class="in"><input id="askIn" type="text" placeholder="Ask your saves or paste a link" aria-label="Ask your saves" autocomplete="off"><button class="btn primary" id="askGo">Ask</button></div>';
+$("#askIn").onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); const v = e.target.value; e.target.value = ""; sendAsk(v); } };
+$("#askGo").onclick = () => { const i = $("#askIn"); const v = i.value; i.value = ""; sendAsk(v); i.focus(); };
+
+/* ---------- events ---------- */
+$("#file").onchange = e => { const f = [...e.target.files]; e.target.value = ""; if (f.length) importFiles(f); };
+document.addEventListener("input", e => { if (e.target.id === "q"){ state.query = e.target.value; state.shown = 150; renderGrid(); } });
+document.addEventListener("click", e => {
+  if (e.target.closest("#layer, #dialog, #selbar")) return;
+  const pop = $("#pop"), act = e.target.closest("[data-act]");
+  if (pop && !pop.hidden && !(act && act.dataset.act === "menu")) pop.hidden = true;
+  const lib = e.target.closest("[data-lib]"); if (lib){ switchLib(lib.dataset.lib); return; }
+  const ed = e.target.closest("[data-edit]"); if (ed){ openDetail(ed.dataset.edit); return; }
+  const ad = e.target.closest("[data-add]"); if (ad){ addFound(ad.dataset.add); return; }
+  const wb = e.target.closest("[data-web]"); if (wb){ webSearch(Number(wb.dataset.web)); return; }
+  const see = e.target.closest("[data-see]"); if (see){ state.view = "list"; state.filter = see.dataset.see; state.shown = 150; render(); window.scrollTo(0, 0); return; }
+  const v = e.target.closest("[data-view]"); if (v){ state.view = v.dataset.view; state.selecting = false; state.selected.clear(); render(); if (state.view === "ask") setTimeout(() => $("#askIn").focus(), 50); return; }
+  const f = e.target.closest("[data-f]"); if (f){ state.view = "list"; state.filter = f.dataset.f; state.shown = 150; render(); return; }
+  if (act){
+    const a = act.dataset.act, c = catById(state.filter);
+    const fns = { menu: () => { pop.hidden = !pop.hidden; }, import: () => $("#file").click(), ai: openAi, export: exportJson, clearcats: clearCategories,
+      renamelib: renameLib, dellib: deleteLib, key: () => openKeySheet(), savefile: openSaveSheet, ig: openIgSheet, newcat: newCategory, cols: useInstagramCollections,
+      more: () => { state.shown += 300; renderGrid(); },
+      select: () => { state.selecting = !state.selecting; state.selected.clear(); render(); },
+      rename: () => c && renameCategory(c), delcat: () => c && deleteCategory(c) };
+    if (fns[a]){ fns[a](); return; }
+  }
+  const tile = e.target.closest(".tile.selecting");
+  if (tile){ const k = tile.dataset.k; state.selected.has(k) ? state.selected.delete(k) : state.selected.add(k); tile.outerHTML = tileHtml(state.posts.find(p => p.k === k)); renderSelbar(); }
+});
+document.addEventListener("dragover", e => { if (state.posts.length) e.preventDefault(); });
+document.addEventListener("drop", e => { if (state.posts.length && e.dataTransfer && e.dataTransfer.files.length){ e.preventDefault(); importFiles([...e.dataTransfer.files]); } });
+
+/* ---------- boot ---------- */
+(async function init(){
+  render();
+  store = await pickStore();
+  try {
+    const libs = await store.get("libs");
+    if (libs){
+      state.libs = libs.list || [];
+      const cur = state.libs.find(l => l.id === libs.current) || state.libs[0];
+      if (cur) await loadLib(cur);
+    } else {
+      const legacy = await store.get("meta");  // migrate data from the first version
+      if (legacy){
+        const posts = [];
+        for (let i = 0; i < (legacy.chunkCount || 0); i++){ const c = await store.get("chunk_" + i); if (c) posts.push(...(c.posts || [])); }
+        state.libs = [{ id: "main", name: "My saves", created: nowS() }]; state.lib = state.libs[0]; resetLibState();
+        state.posts = posts; state.cats = legacy.cats || []; state.settings = Object.assign(defaults(), legacy.settings || {}); state.colImported = !!legacy.colImported;
+        dirty.all = true; dirty.meta = true; await flush(); await saveLibs();
+        if (syncState !== "error"){ await store.del("meta"); for (let i = 0; i < (legacy.chunkCount || 0); i++) await store.del("chunk_" + i); }
+      }
+    }
+    if (syncState !== "error") setSync("saved");
+  } catch { setSync("error"); }
+  if (EMBEDDED && OWNKEY && (EMBEDDED.savedAt || 0) > (state.savedAt || 0)){
+    await openLibrary(EMBEDDED, true);
+    toast("Opened your library from this file");
+  }
+  if (OWNKEY && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  // When hosted (e.g. GitHub Pages), make Reelcall installable: Chrome turns it into a real app on the phone.
+  if (OWNKEY && !NATIVE && /^https:/.test(location.href)){
+    const link = document.createElement("link"); link.rel = "manifest"; link.href = "manifest.json"; document.head.append(link);
+    const meta = document.createElement("meta"); meta.name = "theme-color"; meta.content = "#F7F3FF"; document.head.append(meta);
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  state.loaded = true;
+  render();
+  getSample().then(s => { aiAvailable = !!s; render(); });
+  if (/^#ig=/.test(location.hash)){
+    let found = [];
+    try { found = parseExport(JSON.parse(decodeURIComponent(location.hash.slice(4)))); } catch { toast("Couldn't read the saves from Instagram. Try the bookmark again.", true); }
+    history.replaceState(null, "", location.pathname + location.search);
+    if (found.length) setTimeout(() => importFromInstagram(found), 300);
+  }
+  if (NATIVE){
+    const ig = igState();
+    if (ig.pending) setTimeout(() => syncInstagram(false), 1200);                                   // back from logging in
+    else if (ig.on && ig.auto && nowS() - ig.last > 2 * 3600) setTimeout(() => syncInstagram(true), 1500);  // quiet check on open
+  }
+  if (NATIVE) document.addEventListener("click", e => { const a = e.target.closest('a[target="_blank"]'); if (a){ e.preventDefault(); e.stopPropagation(); openExternal(a.href); } }, true);
+  if (window.claude && typeof window.claude.use === "function"){
+    window.claude.use("downloads").then(d => { downloadsNS = d; render(); }).catch(() => {});
+    window.claude.use("assets").then(a => { assetsNS = a; }).catch(() => {});
+  }
+})();
+})();
+</script>
+</body>
+</html>
